@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Discord Cryptochat (SecureDM)",
+  "version": "1.0.0",
+  "description": "End-to-end encryption for Discord messages between trusted users",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://discord.com/*",
+    "https://*.discord.com/*",
+    "https://canary.discord.com/*",
+    "https://ptb.discord.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://discord.com/*",
+        "https://*.discord.com/*"
+      ],
+      "js": ["crypto.js", "content.js"],
+      "css": ["style.css"],
+              "run_at": "document_start"
+    }
+  ],
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Discord Cryptochat Settings"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["https://discord.com/*", "https://*.discord.com/*"]
+    }
+  ]
+} 

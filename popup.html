@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Cryptochat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 320px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .popup-container {
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .status-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+
+        .status-indicator.active {
+            background: #48bb78;
+            box-shadow: 0 0 8px rgba(72, 187, 120, 0.6);
+        }
+
+        .status-indicator.inactive {
+            background: #ff6b6b;
+            box-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+        }
+
+        .button {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .button:last-child {
+            margin-bottom: 0;
+        }
+
+        .usage-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            font-size: 12px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <div class="logo">🔐</div>
+            <div class="title">Discord Cryptochat</div>
+            <div class="subtitle">Secure messaging for Discord</div>
+        </div>
+
+        <div class="status-section">
+            <div class="status-item">
+                <span class="status-label">Extension Status</span>
+                <div style="display: flex; align-items: center;">
+                    <span id="extension-status" class="status-value">Loading...</span>
+                    <div id="extension-indicator" class="status-indicator"></div>
+                </div>
+            </div>
+            
+            <div class="status-item">
+                <span class="status-label">Encryption Key</span>
+                <div style="display: flex; align-items: center;">
+                    <span id="key-status" class="status-value">Loading...</span>
+                    <div id="key-indicator" class="status-indicator"></div>
+                </div>
+            </div>
+        </div>
+
+        <button id="open-options" class="button">
+            ⚙️ Open Settings
+        </button>
+
+        <button id="test-encryption" class="button">
+            🧪 Test Encryption
+        </button>
+
+        <div class="divider"></div>
+
+        <div class="usage-info">
+            💡 Type <strong>!priv</strong> before your message in Discord to encrypt it
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html> 

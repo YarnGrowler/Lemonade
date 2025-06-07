@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extension Test</title>
+</head>
+<body>
+    <h1>Discord Cryptochat Extension Test</h1>
+    <p>This page tests if the extension is working.</p>
+    <div id="status">Testing...</div>
+
+    <script>
+        // Test if extension is working
+        console.log('Test page loaded');
+        
+        // Check if content script variables exist
+        setTimeout(() => {
+            const status = document.getElementById('status');
+            
+            if (typeof Logger !== 'undefined') {
+                status.innerHTML = '✅ Extension content script loaded!';
+                status.style.color = 'green';
+            } else {
+                status.innerHTML = '❌ Extension not detected';
+                status.style.color = 'red';
+            }
+        }, 1000);
+    </script>
+</body>
+</html> 

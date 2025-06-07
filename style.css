@@ -1,0 +1,167 @@
+/* Discord Cryptochat Extension Styles */
+
+.crypto-indicator {
+  font-size: 12px !important;
+  margin-left: 5px !important;
+  opacity: 0.7 !important;
+  vertical-align: super !important;
+  pointer-events: none !important;
+}
+
+#discord-crypto-indicator {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 9999 !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  padding: 5px 8px !important;
+  border-radius: 15px !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  transition: opacity 0.3s !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  user-select: none !important;
+}
+
+#discord-crypto-indicator:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Encrypted message styling */
+.crypto-encrypted-message {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-style: italic !important;
+  position: relative !important;
+}
+
+.crypto-encrypted-message::before {
+  content: "🔒 " !important;
+  font-style: normal !important;
+}
+
+/* Decrypted message styling */
+.crypto-decrypted-message {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%) !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  position: relative !important;
+}
+
+.crypto-decrypted-message::before {
+  content: "🔓 " !important;
+  font-style: normal !important;
+}
+
+/* Error message styling */
+.crypto-error-message {
+  background: #ff6b6b !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-style: italic !important;
+}
+
+/* Warning/notification styles */
+.crypto-warning {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background: #ff6b6b !important;
+  color: white !important;
+  padding: 20px !important;
+  border-radius: 10px !important;
+  z-index: 10000 !important;
+  text-align: center !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+  max-width: 400px !important;
+  width: 90% !important;
+}
+
+.crypto-warning h3 {
+  margin: 0 0 10px 0 !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+.crypto-warning p {
+  margin: 0 0 10px 0 !important;
+  line-height: 1.4 !important;
+}
+
+.crypto-warning button {
+  background: white !important;
+  color: #ff6b6b !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  font-weight: bold !important;
+  margin: 5px !important;
+  transition: all 0.3s ease !important;
+}
+
+.crypto-warning button:hover {
+  background: #f0f0f0 !important;
+  transform: translateY(-1px) !important;
+}
+
+.crypto-warning button.secondary {
+  background: transparent !important;
+  color: white !important;
+  border: 1px solid white !important;
+}
+
+.crypto-warning button.secondary:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Error notification styles */
+.crypto-error-notification {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: #ff6b6b !important;
+  color: white !important;
+  padding: 15px !important;
+  border-radius: 5px !important;
+  z-index: 10000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  max-width: 300px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  animation: slideInRight 0.3s ease-out !important;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Success notification styles */
+.crypto-success-notification {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: #48bb78 !important;
+  color: white !important;
+  padding: 15px !important;
+  border-radius: 5px !important;
+  z-index: 10000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  max-width: 300px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  animation: slideInRight 0.3s ease-out !important;
+} 
