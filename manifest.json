@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Discord Cryptochat (SecureDM)",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "End-to-end encryption for Discord messages between trusted users",
   "permissions": [
     "storage",

@@ -164,4 +164,27 @@
   max-width: 300px !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
   animation: slideInRight 0.3s ease-out !important;
+}
+
+/* Hotkey notification animations */
+@keyframes slideInDown {
+  0% {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutUp {
+  0% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
 } 

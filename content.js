@@ -62,15 +62,21 @@ class DiscordCryptochat {
     this.encryptionKey = null;
     this.messageObserver = null;
     this.lastProcessedMessage = null;
+    this.autoEncryptEnabled = false;
+    this.version = "1.2.1";
+    
+    // Add method binding to ensure 'this' context
+    this.isAlreadyEncrypted = this.isAlreadyEncrypted.bind(this);
     
     this.init();
   }
 
   async init() {
     await Logger.log('🔐 [CRYPTO] ========================================');
-    await Logger.log('🔐 [CRYPTO] Discord Cryptochat extension loaded');
+    await Logger.log(`🔐 [CRYPTO] Discord Cryptochat v${this.version} extension loaded`);
     await Logger.log('🔐 [CRYPTO] URL: ' + window.location.href);
     await Logger.log('🔐 [CRYPTO] Document ready state: ' + document.readyState);
+    await Logger.log(`🔐 [CRYPTO] Method check - isAlreadyEncrypted: ${typeof this.isAlreadyEncrypted}`);
     await Logger.log('🔐 [CRYPTO] ========================================');
     
     // Load encryption key
@@ -87,15 +93,21 @@ class DiscordCryptochat {
   }
 
   async loadKey() {
-    console.log('🔐 [CRYPTO] Loading encryption key from storage...');
+    console.log('🔐 [CRYPTO] Loading encryption key and settings from storage...');
     try {
       this.encryptionKey = await discordCrypto.getStoredKey();
+      
+      // Load auto-encrypt setting
+      const result = await chrome.storage.local.get(['autoEncryptEnabled']);
+      this.autoEncryptEnabled = result.autoEncryptEnabled || false;
+      
       if (!this.encryptionKey) {
         console.warn('🔐 [CRYPTO] ❌ No encryption key found. Please set one in the extension options.');
         this.showKeyWarning();
       } else {
         console.log('🔐 [CRYPTO] ✅ Encryption key loaded successfully');
         console.log(`🔐 [CRYPTO] Key length: ${this.encryptionKey.length} characters`);
+        console.log(`🔐 [CRYPTO] Auto-encrypt enabled: ${this.autoEncryptEnabled}`);
       }
     } catch (error) {
       console.error('🔐 [CRYPTO] ❌ Failed to load encryption key:', error);
@@ -104,6 +116,9 @@ class DiscordCryptochat {
 
   async setup() {
     await Logger.log('🔐 [CRYPTO] Starting extension setup...');
+    
+    // Setup message listeners for popup communication
+    this.setupMessageListeners();
     
     // Setup message interception
     await Logger.log('🔐 [CRYPTO] Setting up outgoing message interception...');
@@ -120,11 +135,23 @@ class DiscordCryptochat {
     await Logger.log('🔐 [CRYPTO] ✅ Extension setup complete!');
   }
 
+  setupMessageListeners() {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'updateAutoEncrypt') {
+        this.autoEncryptEnabled = request.enabled;
+        Logger.log(`🔐 [CRYPTO] Auto-encrypt updated: ${this.autoEncryptEnabled}`);
+      }
+    });
+  }
+
   async setupOutgoingMessageInterception() {
     await Logger.log('🔐 [CRYPTO] Setting up outgoing message interception...');
     
     // Flag to prevent processing our own encrypted messages
     this.isProcessingMessage = false;
+    
+    // Setup hotkeys
+    this.setupHotkeys();
     
     // Listen for keydown events on the message input with capture
     document.addEventListener('keydown', async (event) => {
@@ -152,10 +179,87 @@ class DiscordCryptochat {
     await Logger.log('🔐 [CRYPTO] Outgoing message interception setup complete');
   }
 
+  setupHotkeys() {
+    // Global hotkey listener for Ctrl+Shift+E to toggle auto-encrypt
+    document.addEventListener('keydown', async (event) => {
+      // Ctrl+Shift+E to toggle auto-encrypt
+      if (event.ctrlKey && event.shiftKey && event.key === 'E') {
+        event.preventDefault();
+        await this.toggleAutoEncryptHotkey();
+      }
+      
+      // Ctrl+Shift+D to toggle extension on/off
+      if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+        event.preventDefault();
+        await this.toggleExtensionHotkey();
+      }
+    }, true);
+    
+    Logger.log('🔐 [CRYPTO] ✅ Hotkeys setup: Ctrl+Shift+E (toggle auto-encrypt), Ctrl+Shift+D (toggle extension)');
+  }
+
+  async toggleAutoEncryptHotkey() {
+    this.autoEncryptEnabled = !this.autoEncryptEnabled;
+    await chrome.storage.local.set({ autoEncryptEnabled: this.autoEncryptEnabled });
+    
+    const status = this.autoEncryptEnabled ? 'enabled' : 'disabled';
+    const message = `🔐 Auto-encrypt ${status} (Ctrl+Shift+E)`;
+    
+    await Logger.log(message);
+    this.showHotkeyNotification(message, this.autoEncryptEnabled ? 'success' : 'info');
+  }
+
+  async toggleExtensionHotkey() {
+    this.isEnabled = !this.isEnabled;
+    
+    const status = this.isEnabled ? 'enabled' : 'disabled';
+    const message = `🔐 Extension ${status} (Ctrl+Shift+D)`;
+    
+    await Logger.log(message);
+    this.showHotkeyNotification(message, this.isEnabled ? 'success' : 'error');
+  }
+
+  showHotkeyNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999999;
+      background: ${type === 'error' ? '#ff6b6b' : type === 'success' ? '#48bb78' : '#667eea'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      animation: slideInDown 0.3s ease-out;
+      backdrop-filter: blur(10px);
+    `;
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideOutUp 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 3000);
+  }
+
   async handleOutgoingMessage(event, messageBox) {
     // Prevent infinite loop
     if (this.isProcessingMessage) {
       return;
+    }
+
+    // Check if extension is enabled
+    if (!this.isEnabled) {
+      return; // Extension is disabled
     }
     
     await Logger.log('🔐 [CRYPTO] === HANDLING OUTGOING MESSAGE ===');
@@ -181,15 +285,22 @@ class DiscordCryptochat {
     
     await Logger.log(`🔐 [CRYPTO] Message text: "${messageText}"`);
     
-    // Check if it's a !priv message (and not our own ENC: message)
-    if (!messageText.startsWith('!priv ')) {
-      return; // Not a private message, let Discord handle it normally
+    // Determine if we should encrypt this message
+    const shouldEncrypt = this.autoEncryptEnabled || messageText.startsWith('!priv ');
+    
+    if (!shouldEncrypt) {
+      return; // Not a message to encrypt, let Discord handle it normally
     }
 
     // Check if it's already encrypted (avoid double processing)
-    if (messageText.includes('ENC:')) {
-      await Logger.log('🔐 [CRYPTO] ⚠️ Message already contains ENC:, skipping to avoid double processing');
-      return;
+    try {
+      if (typeof this.isAlreadyEncrypted === 'function' && this.isAlreadyEncrypted(messageText)) {
+        await Logger.log('🔐 [CRYPTO] ⚠️ Message already encrypted, skipping to avoid double processing');
+        return;
+      }
+    } catch (error) {
+      await Logger.log(`🔐 [CRYPTO] ⚠️ Error checking encryption status: ${error.message}`);
+      // Continue anyway - better to attempt encryption than fail completely
     }
 
     await Logger.log('🔐 [CRYPTO] ✅ Detected !priv message!');
@@ -202,12 +313,13 @@ class DiscordCryptochat {
       return;
     }
 
-    // Extract the actual message (remove !priv prefix)
-    const actualMessage = messageText.substring(6).trim();
+    // Extract the actual message (remove !priv prefix if present)
+    const actualMessage = messageText.startsWith('!priv ') ? 
+      messageText.substring(6).trim() : messageText.trim();
     await Logger.log(`🔐 [CRYPTO] Actual message to encrypt: "${actualMessage}"`);
     
     if (!actualMessage) {
-      await Logger.log('🔐 [CRYPTO] ❌ No actual message content after !priv');
+      await Logger.log('🔐 [CRYPTO] ❌ No actual message content to encrypt');
       return;
     }
 
@@ -221,7 +333,7 @@ class DiscordCryptochat {
 
       await Logger.log('🔐 [CRYPTO] 🔒 Starting encryption...');
       const encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
-      const finalMessage = `ENC:${encryptedMessage}`;
+      const finalMessage = this.encodeStealthMessage(encryptedMessage);
       await Logger.log(`🔐 [CRYPTO] ✅ Encryption complete: ${finalMessage}`);
 
       // HYBRID APPROACH: Use Clipboard API for reliable text replacement
@@ -343,38 +455,90 @@ class DiscordCryptochat {
     // Scan immediately on load
     setTimeout(() => this.scanAllMessages(), 1000);
     
-    // Then scan every 3 seconds
-    this.decryptionInterval = setInterval(() => {
-      this.scanAllMessages();
-    }, 3000);
+    // Use adaptive scanning frequency based on activity
+    this.lastScanTime = Date.now();
+    this.scanFrequency = 3000; // Start with 3 seconds
+    this.maxScanFrequency = 10000; // Max 10 seconds when idle
+    this.minScanFrequency = 1000; // Min 1 second when active
     
-    await Logger.log('🔐 [CRYPTO] ✅ Periodic message scanning started (every 3 seconds)');
+    this.decryptionInterval = setInterval(() => {
+      this.adaptiveScanAllMessages();
+    }, this.scanFrequency);
+    
+    await Logger.log('🔐 [CRYPTO] ✅ Adaptive message scanning started');
+  }
+
+  async adaptiveScanAllMessages() {
+    const now = Date.now();
+    const timeSinceLastScan = now - this.lastScanTime;
+    
+    const result = await this.scanAllMessages();
+    
+    // Adjust scan frequency based on activity
+    if (result.decryptedCount > 0) {
+      // Found encrypted messages - scan more frequently
+      this.scanFrequency = Math.max(this.minScanFrequency, this.scanFrequency - 500);
+    } else {
+      // No encrypted messages - can scan less frequently
+      this.scanFrequency = Math.min(this.maxScanFrequency, this.scanFrequency + 500);
+    }
+    
+    // Update interval if frequency changed significantly
+    const frequencyChange = Math.abs(this.scanFrequency - 3000);
+    if (frequencyChange > 1000) {
+      clearInterval(this.decryptionInterval);
+      this.decryptionInterval = setInterval(() => {
+        this.adaptiveScanAllMessages();
+      }, this.scanFrequency);
+    }
+    
+    this.lastScanTime = now;
   }
 
   async scanAllMessages() {
     try {
-      // Find all message containers
-      const messageContainers = document.querySelectorAll('.messageContent_c19a55, div[class*="messageContent"]');
+      // Find all message containers with more specific selectors
+      const messageContainers = document.querySelectorAll('.messageContent_c19a55, div[class*="messageContent"]:not([data-crypto-processed])');
       
       if (messageContainers.length === 0) {
-        return; // No messages found
+        return { processedCount: 0, decryptedCount: 0 }; // No messages found
       }
       
       let processedCount = 0;
       let decryptedCount = 0;
+      let skippedCount = 0;
       
-      for (const messageContent of messageContainers) {
-        const result = await this.processMessageContent(messageContent);
-        if (result.processed) processedCount++;
-        if (result.decrypted) decryptedCount++;
+      // Process in batches to avoid blocking the main thread
+      const batchSize = 10;
+      for (let i = 0; i < messageContainers.length; i += batchSize) {
+        const batch = Array.from(messageContainers).slice(i, i + batchSize);
+        
+        // Process batch
+        const batchPromises = batch.map(messageContent => this.processMessageContent(messageContent));
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Count results
+        for (const result of batchResults) {
+          if (result.processed) processedCount++;
+          if (result.decrypted) decryptedCount++;
+          if (result.skipped) skippedCount++;
+        }
+        
+        // Yield control to the main thread between batches
+        if (i + batchSize < messageContainers.length) {
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
       }
       
       if (decryptedCount > 0) {
-        await Logger.log(`🔐 [CRYPTO] 🔓 Scan complete: ${decryptedCount} messages decrypted out of ${processedCount} encrypted messages found`);
+        await Logger.log(`🔐 [CRYPTO] 🔓 Scan complete: ${decryptedCount} decrypted, ${processedCount} processed, ${skippedCount} skipped (${messageContainers.length} total)`);
       }
+      
+      return { processedCount, decryptedCount, skippedCount, totalMessages: messageContainers.length };
       
     } catch (error) {
       console.error('🔐 [CRYPTO] ❌ Error during message scan:', error);
+      return { processedCount: 0, decryptedCount: 0, skippedCount: 0, totalMessages: 0 };
     }
   }
 
@@ -427,24 +591,24 @@ class DiscordCryptochat {
   async processMessageContent(messageContent) {
     // Return early if no encryption key or already processed
     if (!this.encryptionKey || !messageContent) {
-      return { processed: false, decrypted: false };
+      return { processed: false, decrypted: false, skipped: false };
     }
 
     // Avoid processing the same message multiple times
     if (messageContent.dataset.cryptoProcessed) {
-      return { processed: false, decrypted: false };
+      return { processed: false, decrypted: false, skipped: true };
     }
 
     const messageText = messageContent.textContent?.trim() || '';
     
-    // Only process encrypted messages
-    if (!messageText.startsWith('ENC:')) {
-      return { processed: false, decrypted: false };
+    // Only process encrypted messages (now in stealth Chinese format)
+    if (!this.isAlreadyEncrypted || !this.isAlreadyEncrypted(messageText)) {
+      return { processed: false, decrypted: false, skipped: false };
     }
 
     try {
-      // Extract the encrypted payload
-      const encryptedPayload = messageText.substring(4);
+      // Decode the stealth message to get base64
+      const encryptedPayload = this.decodeStealthMessage(messageText);
       
       // Decrypt the message
       const decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
@@ -458,7 +622,7 @@ class DiscordCryptochat {
       // Mark as processed
       messageContent.dataset.cryptoProcessed = 'true';
       
-      return { processed: true, decrypted: true };
+      return { processed: true, decrypted: true, skipped: false };
       
     } catch (error) {
       // Add error indicator for failed decryption
@@ -467,7 +631,7 @@ class DiscordCryptochat {
       messageContent.style.fontStyle = 'italic';
       messageContent.dataset.cryptoProcessed = 'true';
       
-      return { processed: true, decrypted: false };
+      return { processed: true, decrypted: false, skipped: false };
     }
   }
 
@@ -607,6 +771,109 @@ class DiscordCryptochat {
 
   openOptions() {
     chrome.runtime.sendMessage({ action: 'openOptions' });
+  }
+
+  // Stealth encoding methods
+  encodeStealthMessage(base64Data) {
+    // Convert base64 to Chinese characters to make it look natural
+    const chineseChars = this.base64ToChinese(base64Data);
+    // Add spaces every 4-6 characters for natural appearance
+    return this.addSpacesToChinese(chineseChars);
+  }
+
+  decodeStealthMessage(chineseText) {
+    // Remove spaces first, then convert Chinese characters back to base64
+    const cleanChinese = this.removeSpacesFromChinese(chineseText);
+    return this.chineseToBase64(cleanChinese);
+  }
+
+  addSpacesToChinese(chineseText) {
+    // Add spaces every 4-6 characters with some randomness for natural look
+    let result = '';
+    for (let i = 0; i < chineseText.length; i++) {
+      result += chineseText[i];
+      // Add space every 4-6 characters (varying for natural appearance)
+      const spaceInterval = 4 + (i % 3); // Creates pattern of 4,5,6,4,5,6...
+      if ((i + 1) % spaceInterval === 0 && i < chineseText.length - 1) {
+        result += ' ';
+      }
+    }
+    return result;
+  }
+
+  removeSpacesFromChinese(chineseText) {
+    // Simply remove all spaces
+    return chineseText.replace(/\s+/g, '');
+  }
+
+  base64ToChinese(base64) {
+    // Take base64 string and convert each character to a Chinese character
+    let result = '';
+    const baseCharCode = 0x4E00; // Start of CJK unified ideographs
+    
+    for (let i = 0; i < base64.length; i++) {
+      const charCode = base64.charCodeAt(i);
+      // Map ASCII range to Chinese characters
+      const chineseCharCode = baseCharCode + (charCode * 13 + i * 7) % 3000;
+      result += String.fromCharCode(chineseCharCode);
+    }
+    
+    return result;
+  }
+
+  chineseToBase64(chineseText) {
+    // Convert Chinese characters back to base64
+    let result = '';
+    const baseCharCode = 0x4E00;
+    
+    for (let i = 0; i < chineseText.length; i++) {
+      const chineseCharCode = chineseText.charCodeAt(i);
+      const offset = chineseCharCode - baseCharCode;
+      
+      // Reverse the mapping
+      let originalCharCode = 33; // Start searching from '!'
+      for (let j = 33; j <= 126; j++) {
+        if ((j * 13 + i * 7) % 3000 === offset) {
+          originalCharCode = j;
+          break;
+        }
+      }
+      
+      result += String.fromCharCode(originalCharCode);
+    }
+    
+    return result;
+  }
+
+  isAlreadyEncrypted(text) {
+    // Check if text looks like our encoded Chinese characters
+    if (!text || text.length === 0) return false;
+    
+    // Remove spaces to count only Chinese characters
+    const textWithoutSpaces = text.replace(/\s+/g, '');
+    if (textWithoutSpaces.length === 0) return false;
+    
+    // Check if most non-space characters are in the CJK range we use
+    let chineseCount = 0;
+    for (let i = 0; i < textWithoutSpaces.length; i++) {
+      const charCode = textWithoutSpaces.charCodeAt(i);
+      if (charCode >= 0x4E00 && charCode <= 0x7000) {
+        chineseCount++;
+      }
+    }
+    
+    // If more than 70% are in our Chinese range, consider it encrypted
+    // Lowered threshold to account for potential compression artifacts
+    const ratio = chineseCount / textWithoutSpaces.length;
+    
+    // Also add minimum length check to avoid false positives
+    const isEncrypted = ratio > 0.7 && textWithoutSpaces.length >= 10;
+    
+    if (isEncrypted) {
+      console.log(`🔐 [CRYPTO] Detected encrypted message: "${text.substring(0, 50)}..." (${chineseCount}/${textWithoutSpaces.length} = ${(ratio*100).toFixed(1)}%)`);
+    }
+    
+    return isEncrypted;
   }
 }
 

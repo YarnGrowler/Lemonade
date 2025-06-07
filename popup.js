@@ -9,15 +9,28 @@ class PopupManager {
     this.extensionIndicatorEl = document.getElementById('extension-indicator');
     this.keyStatusEl = document.getElementById('key-status');
     this.keyIndicatorEl = document.getElementById('key-indicator');
+    this.autoEncryptStatusEl = document.getElementById('auto-encrypt-status');
+    this.autoEncryptToggleEl = document.getElementById('auto-encrypt-toggle');
     this.openOptionsBtn = document.getElementById('open-options');
     this.testEncryptionBtn = document.getElementById('test-encryption');
+    this.viewChangelogBtn = document.getElementById('view-changelog');
     
     this.init();
   }
 
   async init() {
+    this.loadVersion();
     await this.checkStatus();
     this.setupEventListeners();
+  }
+
+  loadVersion() {
+    // Get version from manifest
+    const manifest = chrome.runtime.getManifest();
+    const versionEl = document.getElementById('version');
+    if (versionEl) {
+      versionEl.textContent = manifest.version;
+    }
   }
 
   async checkStatus() {
@@ -26,8 +39,9 @@ class PopupManager {
       this.extensionStatusEl.textContent = 'Active';
       this.extensionIndicatorEl.className = 'status-indicator active';
 
-      // Check encryption key status
-      const result = await chrome.storage.local.get(['encryptionKey']);
+      // Check encryption key and auto-encrypt status
+      const result = await chrome.storage.local.get(['encryptionKey', 'autoEncryptEnabled']);
+      
       if (result.encryptionKey) {
         this.keyStatusEl.textContent = 'Set';
         this.keyIndicatorEl.className = 'status-indicator active';
@@ -35,12 +49,19 @@ class PopupManager {
         this.keyStatusEl.textContent = 'Not Set';
         this.keyIndicatorEl.className = 'status-indicator inactive';
       }
+
+      // Update auto-encrypt status
+      const autoEncryptEnabled = result.autoEncryptEnabled || false;
+      this.autoEncryptStatusEl.textContent = autoEncryptEnabled ? 'On' : 'Off';
+      this.autoEncryptToggleEl.checked = autoEncryptEnabled;
+      
     } catch (error) {
       console.error('Failed to check status:', error);
       this.extensionStatusEl.textContent = 'Error';
       this.extensionIndicatorEl.className = 'status-indicator inactive';
       this.keyStatusEl.textContent = 'Error';
       this.keyIndicatorEl.className = 'status-indicator inactive';
+      this.autoEncryptStatusEl.textContent = 'Error';
     }
   }
 
@@ -52,6 +73,42 @@ class PopupManager {
     this.testEncryptionBtn.addEventListener('click', async () => {
       await this.testEncryption();
     });
+
+    this.autoEncryptToggleEl.addEventListener('change', async () => {
+      await this.toggleAutoEncrypt();
+    });
+
+    this.viewChangelogBtn.addEventListener('click', () => {
+      this.showChangelog();
+    });
+  }
+
+  async toggleAutoEncrypt() {
+    try {
+      const isEnabled = this.autoEncryptToggleEl.checked;
+      await chrome.storage.local.set({ autoEncryptEnabled: isEnabled });
+      
+      this.autoEncryptStatusEl.textContent = isEnabled ? 'On' : 'Off';
+      
+      // Notify content script of the change
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.url && tab.url.includes('discord.com')) {
+          chrome.tabs.sendMessage(tab.id, { 
+            action: 'updateAutoEncrypt', 
+            enabled: isEnabled 
+          });
+        }
+      } catch (error) {
+        console.log('Could not notify content script:', error);
+      }
+      
+      this.showNotification(`Auto-encrypt ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
+      
+    } catch (error) {
+      console.error('Failed to toggle auto-encrypt:', error);
+      this.showNotification('Failed to update setting', 'error');
+    }
   }
 
   openOptions() {
@@ -140,6 +197,104 @@ class PopupManager {
         notification.remove();
       }
     }, 3000);
+  }
+
+  showChangelog() {
+    const changelogModal = document.createElement('div');
+    changelogModal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    `;
+
+    const changelogContent = document.createElement('div');
+    changelogContent.style.cssText = `
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      position: relative;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    `;
+
+    changelogContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0; font-size: 20px;">🔐 What's New in v1.2.0</h2>
+        <button id="close-changelog" style="
+          background: rgba(255,255,255,0.2);
+          border: none;
+          color: white;
+          padding: 8px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 16px;
+        ">✕</button>
+      </div>
+      
+      <div style="line-height: 1.6;">
+        <h3 style="color: #48bb78; margin: 16px 0 8px 0;">🎉 New Features</h3>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>Smart Chinese Spacing:</strong> Messages now look natural with proper spacing</li>
+          <li><strong>Text Compression:</strong> Shorter encrypted messages (30-50% smaller)</li>
+          <li><strong>Hotkey Support:</strong> Ctrl+Shift+E (auto-encrypt), Ctrl+Shift+D (toggle)</li>
+          <li><strong>Version Display:</strong> Always know which version you're running</li>
+        </ul>
+
+        <h3 style="color: #667eea; margin: 16px 0 8px 0;">🔧 Improvements</h3>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>Better Detection:</strong> More reliable encrypted message recognition</li>
+          <li><strong>Enhanced UI:</strong> Animated notifications and better visual feedback</li>
+          <li><strong>Performance:</strong> Optimized encryption and decryption algorithms</li>
+        </ul>
+
+        <h3 style="color: #ff6b6b; margin: 16px 0 8px 0;">🚀 Coming Soon</h3>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>Multi-key support for different servers</li>
+          <li>Message expiry and auto-delete</li>
+          <li>File encryption support</li>
+          <li>Advanced compression algorithms</li>
+        </ul>
+
+        <div style="
+          background: rgba(255,255,255,0.1);
+          padding: 12px;
+          border-radius: 8px;
+          margin-top: 16px;
+          text-align: center;
+        ">
+          ⌨️ <strong>Try the new hotkeys!</strong><br>
+          Ctrl+Shift+E to toggle auto-encrypt<br>
+          Ctrl+Shift+D to toggle extension
+        </div>
+      </div>
+    `;
+
+    changelogModal.appendChild(changelogContent);
+    document.body.appendChild(changelogModal);
+
+    // Close functionality
+    document.getElementById('close-changelog').addEventListener('click', () => {
+      changelogModal.remove();
+    });
+
+    changelogModal.addEventListener('click', (e) => {
+      if (e.target === changelogModal) {
+        changelogModal.remove();
+      }
+    });
   }
 }
 
