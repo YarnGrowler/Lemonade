@@ -109,9 +109,9 @@ class DiscordCryptochat {
     await Logger.log('🔐 [CRYPTO] Setting up outgoing message interception...');
     await this.setupOutgoingMessageInterception();
     
-    // Setup incoming message decryption (DISABLED for now)
-    await Logger.log('🔐 [CRYPTO] Incoming message decryption disabled');
-    // this.setupIncomingMessageDecryption();
+    // Setup incoming message decryption
+    await Logger.log('🔐 [CRYPTO] Setting up incoming message decryption...');
+    await this.setupIncomingMessageDecryption();
     
     // Add extension indicator
     await Logger.log('🔐 [CRYPTO] Adding extension indicator...');
@@ -329,18 +329,64 @@ class DiscordCryptochat {
     }
   }
 
-  setupIncomingMessageDecryption() {
-    // Find the messages container
+  async setupIncomingMessageDecryption() {
+    await Logger.log('🔐 [CRYPTO] Setting up comprehensive decryption system...');
+    
+    // Start periodic scanning immediately
+    await this.startPeriodicDecryption();
+    
+    // Also setup mutation observer for real-time detection
+    this.setupMutationObserver();
+  }
+
+  async startPeriodicDecryption() {
+    // Scan immediately on load
+    setTimeout(() => this.scanAllMessages(), 1000);
+    
+    // Then scan every 3 seconds
+    this.decryptionInterval = setInterval(() => {
+      this.scanAllMessages();
+    }, 3000);
+    
+    await Logger.log('🔐 [CRYPTO] ✅ Periodic message scanning started (every 3 seconds)');
+  }
+
+  async scanAllMessages() {
+    try {
+      // Find all message containers
+      const messageContainers = document.querySelectorAll('.messageContent_c19a55, div[class*="messageContent"]');
+      
+      if (messageContainers.length === 0) {
+        return; // No messages found
+      }
+      
+      let processedCount = 0;
+      let decryptedCount = 0;
+      
+      for (const messageContent of messageContainers) {
+        const result = await this.processMessageContent(messageContent);
+        if (result.processed) processedCount++;
+        if (result.decrypted) decryptedCount++;
+      }
+      
+      if (decryptedCount > 0) {
+        await Logger.log(`🔐 [CRYPTO] 🔓 Scan complete: ${decryptedCount} messages decrypted out of ${processedCount} encrypted messages found`);
+      }
+      
+    } catch (error) {
+      console.error('🔐 [CRYPTO] ❌ Error during message scan:', error);
+    }
+  }
+
+  setupMutationObserver() {
     const findMessagesContainer = () => {
-      return document.querySelector('ol[class*="scrollerInner"]');
+      return document.querySelector('ol[class*="scrollerInner"], .scrollerInner__36d07');
     };
 
-    // Setup mutation observer for new messages
-    const setupMessageObserver = () => {
+    const setupObserver = async () => {
       const messagesContainer = findMessagesContainer();
       if (!messagesContainer) {
-        // Retry after a short delay
-        setTimeout(setupMessageObserver, 1000);
+        setTimeout(setupObserver, 1000);
         return;
       }
 
@@ -348,7 +394,20 @@ class DiscordCryptochat {
         mutations.forEach((mutation) => {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              this.processNewMessage(node);
+              // Look for message content in the new node
+              const messageContents = node.querySelectorAll ? 
+                node.querySelectorAll('.messageContent_c19a55, div[class*="messageContent"]') : [];
+              
+              // Also check if the node itself is a message content
+              if (node.classList && (node.classList.contains('messageContent_c19a55') || 
+                  Array.from(node.classList).some(cls => cls.includes('messageContent')))) {
+                this.processMessageContent(node);
+              }
+              
+              // Process any message contents found within
+              messageContents.forEach(messageContent => {
+                this.processMessageContent(messageContent);
+              });
             }
           });
         });
@@ -359,61 +418,36 @@ class DiscordCryptochat {
         subtree: true
       });
 
-      // Process existing messages
-      messagesContainer.querySelectorAll('li[class*="messageListItem"]').forEach(
-        (messageItem) => this.processNewMessage(messageItem)
-      );
+      await Logger.log('🔐 [CRYPTO] ✅ Real-time message observer setup complete');
     };
 
-    setupMessageObserver();
+    setupObserver();
   }
 
-  async processNewMessage(messageElement) {
-    console.log('🔐 [CRYPTO] === PROCESSING NEW MESSAGE ===');
-    console.log('🔐 [CRYPTO] Message element:', messageElement);
-    
-    if (!this.encryptionKey) {
-      console.log('🔐 [CRYPTO] ❌ No encryption key available for decryption');
-      return;
+  async processMessageContent(messageContent) {
+    // Return early if no encryption key or already processed
+    if (!this.encryptionKey || !messageContent) {
+      return { processed: false, decrypted: false };
     }
-
-    console.log('🔐 [CRYPTO] ✅ Encryption key available for decryption');
-
-    // Find message content
-    const messageContent = messageElement.querySelector('div[class*="messageContent"]');
-    console.log('🔐 [CRYPTO] Message content element:', messageContent);
-    
-    if (!messageContent) {
-      console.log('🔐 [CRYPTO] ❌ No message content found');
-      return;
-    }
-
-    const messageText = messageContent.textContent.trim();
-    console.log(`🔐 [CRYPTO] Message text: "${messageText}"`);
-    
-    if (!messageText.startsWith('ENC:')) {
-      console.log('🔐 [CRYPTO] Message does not start with "ENC:", ignoring');
-      return; // Not an encrypted message
-    }
-
-    console.log('🔐 [CRYPTO] ✅ Detected encrypted message!');
 
     // Avoid processing the same message multiple times
     if (messageContent.dataset.cryptoProcessed) {
-      console.log('🔐 [CRYPTO] Message already processed, skipping');
-      return;
+      return { processed: false, decrypted: false };
+    }
+
+    const messageText = messageContent.textContent?.trim() || '';
+    
+    // Only process encrypted messages
+    if (!messageText.startsWith('ENC:')) {
+      return { processed: false, decrypted: false };
     }
 
     try {
-      console.log('🔐 [CRYPTO] 🔓 Starting decryption...');
-      
       // Extract the encrypted payload
       const encryptedPayload = messageText.substring(4);
-      console.log(`🔐 [CRYPTO] Encrypted payload length: ${encryptedPayload.length}`);
       
       // Decrypt the message
       const decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
-      console.log(`🔐 [CRYPTO] ✅ Decryption successful: "${decryptedMessage}"`);
       
       // Replace the message content
       messageContent.textContent = decryptedMessage;
@@ -424,18 +458,16 @@ class DiscordCryptochat {
       // Mark as processed
       messageContent.dataset.cryptoProcessed = 'true';
       
-      console.log('🔐 [CRYPTO] ✅ Message decryption and display complete');
+      return { processed: true, decrypted: true };
       
     } catch (error) {
-      console.error('🔐 [CRYPTO] ❌ Failed to decrypt message:', error);
-      
-      // Add error indicator
+      // Add error indicator for failed decryption
       messageContent.textContent = '🔒 [Encrypted message - decryption failed]';
       messageContent.style.color = '#ff6b6b';
       messageContent.style.fontStyle = 'italic';
       messageContent.dataset.cryptoProcessed = 'true';
       
-      console.log('🔐 [CRYPTO] ❌ Marked message as decryption failed');
+      return { processed: true, decrypted: false };
     }
   }
 
