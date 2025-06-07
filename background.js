@@ -57,21 +57,259 @@ chrome.action.onClicked.addListener((tab) => {
 
 console.log('Discord Cryptochat background script loaded');
 
-// Test webhook notification from background
-const WEBHOOK_URL = 'https://discord.com/api/webhooks/1345932624652140584/WnG26lT9h401KzBAjOOsiiMNvYBaJdW7HyOY1Nu-eLNM2y_3Lgl-CzIlG_VrzRG7edNE';
+// ==================== KEY ROTATION MONITORING ====================
 
-async function notifyWebhook(message) {
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: `[BACKGROUND] ${message}`
-      })
+class BackgroundKeyRotation {
+  constructor() {
+    this.lastKeyRotationCheck = 0;
+    this.keyRotationCheckInterval = 10000; // 10 seconds
+    this.currentStoredKey = null;
+    this.init();
+  }
+
+  async init() {
+    console.log('🔐 [BACKGROUND] Initializing key rotation monitoring...');
+    
+    // Load current stored key
+    const result = await chrome.storage.local.get(['encryptionKey']);
+    this.currentStoredKey = result.encryptionKey;
+    
+    // Start monitoring immediately
+    this.startKeyRotationMonitoring();
+  }
+
+  startKeyRotationMonitoring() {
+    // Check immediately on startup
+    setTimeout(() => this.checkAndRotateKey(), 1000);
+    
+    // Then check every 10 seconds
+    setInterval(() => this.checkAndRotateKey(), this.keyRotationCheckInterval);
+    
+    console.log('🔐 [BACKGROUND] 🔄 Key rotation monitoring started');
+  }
+
+  async checkAndRotateKey() {
+    try {
+      const now = Date.now();
+      
+      // Don't check too frequently
+      if (now - this.lastKeyRotationCheck < this.keyRotationCheckInterval) {
+        return;
+      }
+      
+      this.lastKeyRotationCheck = now;
+      
+      const settings = await this.getKeyRotationSettings();
+      if (!settings.enabled || !settings.intervalMs) {
+        return; // Key rotation not configured
+      }
+      
+      // For first rotation we need base key, for subsequent rotations we don't
+      const rotationData = await this.getLastRotationData();
+      if (rotationData.count === 0 && !settings.baseKey) {
+        console.log('🔐 [BACKGROUND] ⚠️ Base key required for first rotation but not found');
+        return;
+      }
+      
+      const currentKey = await this.getCurrentRotatedKey(settings);
+      const storedKey = await this.getStoredKey();
+      
+      if (currentKey !== storedKey) {
+        console.log('🔐 [BACKGROUND] 🔄 Key rotation needed - updating key');
+        console.log(`🔐 [BACKGROUND] Old key: ${storedKey?.substring(0, 8)}...`);
+        console.log(`🔐 [BACKGROUND] New key: ${currentKey?.substring(0, 8)}...`);
+        
+                 await this.storeKey(currentKey);
+         this.currentStoredKey = currentKey;
+         
+         // Update rotation tracking
+         await this.updateRotationData();
+         
+         // Security: Delete base key after first rotation
+         await this.deleteBaseKeyAfterFirstRotation(settings);
+         
+         // Notify all Discord content scripts about key update
+         await this.notifyContentScriptsKeyUpdate(currentKey);
+        
+        console.log('🔐 [BACKGROUND] ✅ Key rotation completed and content scripts notified');
+      }
+      
+    } catch (error) {
+      console.error('🔐 [BACKGROUND] ❌ Key rotation check failed:', error);
+    }
+  }
+
+  async getCurrentRotatedKey(settings) {
+    const { baseKey, intervalMs, startTimestamp } = settings;
+    const now = Date.now();
+    
+    // Get current stored key and rotation data
+    const storedKey = await this.getStoredKey();
+    const lastRotationData = await this.getLastRotationData();
+    
+    console.log(`🔐 [BACKGROUND] 🔄 Rotation check: stored key exists=${!!storedKey}, last rotation count=${lastRotationData.count}, last timestamp=${lastRotationData.timestamp}`);
+    
+    // Determine next rotation time
+    let nextRotationTime;
+    if (lastRotationData.count === 0 && lastRotationData.timestamp === 0) {
+      // First rotation ever
+      nextRotationTime = startTimestamp + intervalMs;
+      console.log(`🔐 [BACKGROUND] 🔄 First rotation scheduled at ${new Date(nextRotationTime)}`);
+    } else {
+      // Subsequent rotations based on last rotation
+      nextRotationTime = lastRotationData.timestamp + intervalMs;
+      console.log(`🔐 [BACKGROUND] 🔄 Next rotation scheduled at ${new Date(nextRotationTime)}`);
+    }
+    
+    // Check if rotation is needed
+    if (now >= nextRotationTime) {
+      const newRotationCount = lastRotationData.count + 1;
+      console.log(`🔐 [BACKGROUND] 🔄 Performing rotation #${newRotationCount}`);
+      
+      // For first rotation, use base key. For subsequent rotations, use current stored key
+      const sourceKey = (lastRotationData.count === 0) ? baseKey : storedKey;
+      
+      if (!sourceKey) {
+        throw new Error(`Source key missing for rotation #${newRotationCount}`);
+      }
+      
+      // Simple sequential hashing - no entropy for better sync compatibility
+      const newKey = await this.simpleHashKey(sourceKey, newRotationCount);
+      
+      console.log(`🔐 [BACKGROUND] 🔄 Rotation #${newRotationCount}: ${sourceKey.substring(0, 8)}... → ${newKey.substring(0, 8)}...`);
+      
+      return newKey;
+    }
+    
+    // No rotation needed - return current key
+    console.log(`🔐 [BACKGROUND] 🔄 No rotation needed (next in ${Math.ceil((nextRotationTime - now) / 1000)}s)`);
+    return storedKey;
+  }
+
+  async simpleHashKey(key, rotationNumber) {
+    // Simple sequential hashing: hash(key + rotation number)
+    // Much simpler and more reliable for sync
+    const combinedString = `${key}::rotation::${rotationNumber}`;
+    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(combinedString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    // Convert to hex string
+    return Array.from(hashArray)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async deleteBaseKeyAfterFirstRotation(settings) {
+    // Only delete base key after we've confirmed first rotation is complete
+    const rotationData = await this.getLastRotationData();
+    
+    if (rotationData.count >= 1) {
+      const result = await chrome.storage.local.get(['keyRotationBaseKey']);
+      if (result.keyRotationBaseKey) {
+        await chrome.storage.local.remove(['keyRotationBaseKey']);
+        console.log('🔐 [BACKGROUND] 🗑️ Base key securely deleted after first rotation');
+      }
+    }
+  }
+
+  async notifyContentScriptsKeyUpdate(newKey) {
+    try {
+      const tabs = await chrome.tabs.query({});
+      let notificationsSent = 0;
+      
+      for (const tab of tabs) {
+        if (tab.url && tab.url.includes('discord.com')) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, {
+              action: 'keyRotated',
+              newKey: newKey
+            });
+            notificationsSent++;
+            console.log(`🔐 [BACKGROUND] ✅ Notified tab ${tab.id} of key rotation`);
+          } catch (error) {
+            console.log(`🔐 [BACKGROUND] ⚠️ Failed to notify tab ${tab.id}:`, error.message);
+          }
+        }
+      }
+      
+      console.log(`🔐 [BACKGROUND] 📡 Sent key rotation notifications to ${notificationsSent} Discord tabs`);
+      
+    } catch (error) {
+      console.error('🔐 [BACKGROUND] ❌ Failed to notify content scripts:', error);
+    }
+  }
+
+  async getKeyRotationSettings() {
+    const result = await chrome.storage.local.get([
+      'keyRotationEnabled',
+      'keyRotationBaseKey', 
+      'keyRotationIntervalMs',
+      'keyRotationStartTimestamp'
+    ]);
+    
+    return {
+      enabled: result.keyRotationEnabled || false,
+      baseKey: result.keyRotationBaseKey || null,
+      intervalMs: result.keyRotationIntervalMs || 0,
+      startTimestamp: result.keyRotationStartTimestamp || Date.now()
+    };
+  }
+
+  async getStoredKey() {
+    const result = await chrome.storage.local.get(['encryptionKey']);
+    return result.encryptionKey || null;
+  }
+
+  async storeKey(key) {
+    await chrome.storage.local.set({ encryptionKey: key });
+  }
+
+  async getLastRotationData() {
+    const result = await chrome.storage.local.get(['lastRotationTimestamp', 'rotationCount']);
+    return {
+      timestamp: result.lastRotationTimestamp || 0,
+      count: result.rotationCount || 0
+    };
+  }
+
+  async updateRotationData() {
+    const currentData = await this.getLastRotationData();
+    const newTimestamp = Date.now();
+    const newCount = currentData.count + 1;
+    
+    await chrome.storage.local.set({
+      lastRotationTimestamp: newTimestamp,
+      rotationCount: newCount
     });
-  } catch (error) {
-    console.error('Background webhook failed:', error);
+    
+    console.log(`🔐 [BACKGROUND] 📊 Rotation tracking updated: count=${newCount}, timestamp=${newTimestamp}`);
+  }
+
+  async resetRotationTracking() {
+    await chrome.storage.local.set({
+      lastRotationTimestamp: Date.now(),
+      rotationCount: 0
+    });
+  }
+
+  // Helper method to calculate expected key for any rotation number (for sync debugging)
+  async calculateKeyForRotation(baseKey, intervalMs, rotationNumber) {
+    if (rotationNumber === 0) {
+      return baseKey; // Rotation 0 is the base key itself
+    }
+    
+    // Simple sequential hashing - no entropy needed
+    let currentKey = baseKey;
+    for (let i = 1; i <= rotationNumber; i++) {
+      currentKey = await this.simpleHashKey(currentKey, i);
+    }
+    
+    return currentKey;
   }
 }
 
-notifyWebhook('🔐 Background script loaded and active!'); 
+// Initialize key rotation monitoring
+const keyRotationManager = new BackgroundKeyRotation(); 

@@ -51,10 +51,7 @@ class Logger {
   }
 }
 
-// Immediate load test
-Logger.log('🔐 [CRYPTO] EXTENSION SCRIPT LOADED - Testing if this appears!');
-Logger.log('🔐 [CRYPTO] Current URL: ' + window.location.href);
-Logger.log('🔐 [CRYPTO] User Agent: ' + navigator.userAgent);
+// Extension loaded
 
 class DiscordCryptochat {
   constructor() {
@@ -63,7 +60,7 @@ class DiscordCryptochat {
     this.messageObserver = null;
     this.lastProcessedMessage = null;
     this.autoEncryptEnabled = false;
-    this.version = "1.2.1";
+    this.version = "1.3.0";
     
     // Add method binding to ensure 'this' context
     this.isAlreadyEncrypted = this.isAlreadyEncrypted.bind(this);
@@ -72,28 +69,19 @@ class DiscordCryptochat {
   }
 
   async init() {
-    await Logger.log('🔐 [CRYPTO] ========================================');
-    await Logger.log(`🔐 [CRYPTO] Discord Cryptochat v${this.version} extension loaded`);
-    await Logger.log('🔐 [CRYPTO] URL: ' + window.location.href);
-    await Logger.log('🔐 [CRYPTO] Document ready state: ' + document.readyState);
-    await Logger.log(`🔐 [CRYPTO] Method check - isAlreadyEncrypted: ${typeof this.isAlreadyEncrypted}`);
-    await Logger.log('🔐 [CRYPTO] ========================================');
-    
-    // Load encryption key
+    // Load encryption key and speed settings
     await this.loadKey();
+    await this.loadSpeedSettings();
     
     // Wait for Discord to load
     if (document.readyState === 'loading') {
-      await Logger.log('🔐 [CRYPTO] Document still loading, waiting for DOMContentLoaded...');
       document.addEventListener('DOMContentLoaded', () => this.setup());
     } else {
-      await Logger.log('🔐 [CRYPTO] Document already loaded, setting up immediately...');
       this.setup();
     }
   }
 
   async loadKey() {
-    console.log('🔐 [CRYPTO] Loading encryption key and settings from storage...');
     try {
       this.encryptionKey = await discordCrypto.getStoredKey();
       
@@ -102,44 +90,120 @@ class DiscordCryptochat {
       this.autoEncryptEnabled = result.autoEncryptEnabled || false;
       
       if (!this.encryptionKey) {
-        console.warn('🔐 [CRYPTO] ❌ No encryption key found. Please set one in the extension options.');
         this.showKeyWarning();
-      } else {
-        console.log('🔐 [CRYPTO] ✅ Encryption key loaded successfully');
-        console.log(`🔐 [CRYPTO] Key length: ${this.encryptionKey.length} characters`);
-        console.log(`🔐 [CRYPTO] Auto-encrypt enabled: ${this.autoEncryptEnabled}`);
       }
     } catch (error) {
-      console.error('🔐 [CRYPTO] ❌ Failed to load encryption key:', error);
+      console.error('Failed to load encryption key:', error);
     }
   }
 
-  async setup() {
-    await Logger.log('🔐 [CRYPTO] Starting extension setup...');
+  async loadSpeedSettings() {
+    try {
+      const result = await chrome.storage.local.get(['scanFrequency', 'initialDelay']);
+      
+      // Set configurable speed settings with defaults
+      this.scanFrequency = result.scanFrequency || 1000; // 1 second default
+      this.initialDelay = result.initialDelay || 500; // 0.5 second default
+      this.minScanFrequency = Math.max(500, this.scanFrequency - 500); // Adaptive min
+      this.maxScanFrequency = this.scanFrequency * 3; // Adaptive max
+      
+    } catch (error) {
+      console.error('Failed to load speed settings:', error);
+      // Fallback to defaults
+      this.scanFrequency = 1000;
+      this.initialDelay = 500;
+      this.minScanFrequency = 500;
+      this.maxScanFrequency = 3000;
+    }
+  }
+
+  async forceRefreshKey() {
+    // Force refresh key from storage (backup method)
+    const oldKey = this.encryptionKey ? this.encryptionKey.substring(0, 8) + '...' : 'null';
+    this.encryptionKey = await discordCrypto.getStoredKey();
+    const newKey = this.encryptionKey ? this.encryptionKey.substring(0, 8) + '...' : 'null';
     
+    if (oldKey !== newKey) {
+      this.clearAllProcessedFlags();
+      this.scanAllMessages();
+    }
+  }
+
+  clearAllProcessedFlags() {
+    // Smart cleanup: only restore successfully decrypted messages, leave failed ones as failed
+    const processedMessages = document.querySelectorAll('[data-crypto-processed]');
+    
+    processedMessages.forEach(msg => {
+      // Check if this was a successfully decrypted message (has 🔓 indicator)
+      const wasSuccessfullyDecrypted = msg.querySelector('.crypto-indicator');
+      const isFailedMessage = msg.textContent.includes('🔒 [Encrypted message - decryption failed]');
+      
+      if (wasSuccessfullyDecrypted && !isFailedMessage && msg.dataset.originalEncrypted) {
+        // Restore only successfully decrypted messages to encrypted form
+        msg.textContent = msg.dataset.originalEncrypted;
+        msg.style.color = '';
+        msg.style.fontStyle = '';
+      }
+      // Leave failed messages as they are - don't restore them
+      
+      // Remove crypto-related attributes to allow re-processing
+      msg.removeAttribute('data-crypto-processed');
+      msg.removeAttribute('data-decrypted-with-key');
+      
+      // Remove crypto indicators
+      const indicator = msg.querySelector('.crypto-indicator');
+      if (indicator) {
+        indicator.remove();
+      }
+    });
+  }
+
+  async setup() {
     // Setup message listeners for popup communication
     this.setupMessageListeners();
     
     // Setup message interception
-    await Logger.log('🔐 [CRYPTO] Setting up outgoing message interception...');
     await this.setupOutgoingMessageInterception();
     
     // Setup incoming message decryption
-    await Logger.log('🔐 [CRYPTO] Setting up incoming message decryption...');
     await this.setupIncomingMessageDecryption();
     
     // Add extension indicator
-    await Logger.log('🔐 [CRYPTO] Adding extension indicator...');
     this.addExtensionIndicator();
-    
-    await Logger.log('🔐 [CRYPTO] ✅ Extension setup complete!');
   }
 
   setupMessageListeners() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'updateAutoEncrypt') {
         this.autoEncryptEnabled = request.enabled;
-        Logger.log(`🔐 [CRYPTO] Auto-encrypt updated: ${this.autoEncryptEnabled}`);
+        
+        // Also update storage to ensure consistency
+        chrome.storage.local.set({ autoEncryptEnabled: this.autoEncryptEnabled });
+        
+        // Send confirmation back
+        sendResponse({ success: true, autoEncryptEnabled: this.autoEncryptEnabled });
+      } else if (request.action === 'keyRotated') {
+        // Update the encryption key in real-time
+        this.encryptionKey = request.newKey;
+        
+        // Force re-scan all messages with new key - clear processed flags first
+        setTimeout(() => {
+          this.clearAllProcessedFlags();
+          this.scanAllMessages();
+        }, 500);
+        
+        sendResponse({ success: true });
+      } else if (request.action === 'updateSpeedSettings') {
+        // Update speed settings in real-time
+        this.scanFrequency = request.scanFrequency;
+        this.initialDelay = request.initialDelay;
+        this.minScanFrequency = Math.max(500, this.scanFrequency - 500);
+        this.maxScanFrequency = this.scanFrequency * 3;
+        
+        // Restart decryption with new settings
+        this.restartDecryptionWithNewSpeed();
+        
+        sendResponse({ success: true });
       }
     });
   }
@@ -153,12 +217,9 @@ class DiscordCryptochat {
     // Setup hotkeys
     this.setupHotkeys();
     
-    // Listen for keydown events on the message input with capture
+    // Listen for keydown events on the message input with capture - very aggressive
     document.addEventListener('keydown', async (event) => {
-      // Only log important keypresses to reduce noise
-      if (event.key === 'Enter' && !event.shiftKey && !this.isProcessingMessage) {
-        await Logger.log('🔐 [CRYPTO] Enter key detected (no shift)');
-        
+      if (event.key === 'Enter' && !event.shiftKey) {
         // Safely check if target has required methods
         if (!event.target || typeof event.target.closest !== 'function') {
           return;
@@ -170,13 +231,29 @@ class DiscordCryptochat {
                           event.target.closest('div[contenteditable="true"]');
         
         if (messageBox && messageBox.hasAttribute && messageBox.hasAttribute('data-slate-editor')) {
-          await Logger.log('🔐 [CRYPTO] Found Discord message box');
           await this.handleOutgoingMessage(event, messageBox);
         }
       }
     }, true);
     
-    await Logger.log('🔐 [CRYPTO] Outgoing message interception setup complete');
+    // Additional event listeners for more robust capture
+    document.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey && this.isProcessingMessage) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+    
+    document.addEventListener('keyup', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey && this.isProcessingMessage) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+    
+
   }
 
   setupHotkeys() {
@@ -205,8 +282,15 @@ class DiscordCryptochat {
     const status = this.autoEncryptEnabled ? 'enabled' : 'disabled';
     const message = `🔐 Auto-encrypt ${status} (Ctrl+Shift+E)`;
     
-    await Logger.log(message);
+    await Logger.log(`🔐 [CRYPTO] 🔄 Auto-encrypt toggled via hotkey: ${this.autoEncryptEnabled}`);
     this.showHotkeyNotification(message, this.autoEncryptEnabled ? 'success' : 'info');
+    
+    // Force reload from storage to ensure consistency
+    setTimeout(async () => {
+      const result = await chrome.storage.local.get(['autoEncryptEnabled']);
+      this.autoEncryptEnabled = result.autoEncryptEnabled || false;
+      await Logger.log(`🔐 [CRYPTO] 🔄 Auto-encrypt reloaded after hotkey: ${this.autoEncryptEnabled}`);
+    }, 100);
   }
 
   async toggleExtensionHotkey() {
@@ -252,8 +336,10 @@ class DiscordCryptochat {
   }
 
   async handleOutgoingMessage(event, messageBox) {
-    // Prevent infinite loop
+    // Prevent infinite loop and fast typing bypass
     if (this.isProcessingMessage) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 
@@ -261,8 +347,6 @@ class DiscordCryptochat {
     if (!this.isEnabled) {
       return; // Extension is disabled
     }
-    
-    await Logger.log('🔐 [CRYPTO] === HANDLING OUTGOING MESSAGE ===');
     
     // Get message text - try multiple methods for Discord's Slate editor
     let messageText = '';
@@ -283,8 +367,6 @@ class DiscordCryptochat {
       }
     }
     
-    await Logger.log(`🔐 [CRYPTO] Message text: "${messageText}"`);
-    
     // Determine if we should encrypt this message
     const shouldEncrypt = this.autoEncryptEnabled || messageText.startsWith('!priv ');
     
@@ -295,18 +377,13 @@ class DiscordCryptochat {
     // Check if it's already encrypted (avoid double processing)
     try {
       if (typeof this.isAlreadyEncrypted === 'function' && this.isAlreadyEncrypted(messageText)) {
-        await Logger.log('🔐 [CRYPTO] ⚠️ Message already encrypted, skipping to avoid double processing');
         return;
       }
     } catch (error) {
-      await Logger.log(`🔐 [CRYPTO] ⚠️ Error checking encryption status: ${error.message}`);
       // Continue anyway - better to attempt encryption than fail completely
     }
 
-    await Logger.log('🔐 [CRYPTO] ✅ Detected !priv message!');
-
     if (!this.encryptionKey) {
-      await Logger.log('🔐 [CRYPTO] ❌ No encryption key available');
       event.preventDefault();
       event.stopPropagation();
       this.showKeyWarning();
@@ -316,28 +393,21 @@ class DiscordCryptochat {
     // Extract the actual message (remove !priv prefix if present)
     const actualMessage = messageText.startsWith('!priv ') ? 
       messageText.substring(6).trim() : messageText.trim();
-    await Logger.log(`🔐 [CRYPTO] Actual message to encrypt: "${actualMessage}"`);
     
     if (!actualMessage) {
-      await Logger.log('🔐 [CRYPTO] ❌ No actual message content to encrypt');
       return;
     }
 
     try {
-      // Set processing flag to prevent interference
+      // Set processing flag IMMEDIATELY to prevent interference
       this.isProcessingMessage = true;
       
-      await Logger.log('🔐 [CRYPTO] 🚫 Preventing default message send...');
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation(); // Prevent other listeners
 
-      await Logger.log('🔐 [CRYPTO] 🔒 Starting encryption...');
       const encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
       const finalMessage = this.encodeStealthMessage(encryptedMessage);
-      await Logger.log(`🔐 [CRYPTO] ✅ Encryption complete: ${finalMessage}`);
-
-      // HYBRID APPROACH: Use Clipboard API for reliable text replacement
-      await Logger.log('🔐 [CRYPTO] ✨ Using clipboard-based text replacement...');
       
       // Focus the message box
       messageBox.focus();
@@ -388,10 +458,6 @@ class DiscordCryptochat {
       // Wait for Discord to process
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      await Logger.log(`🔐 [CRYPTO] ✅ Text replaced via clipboard: "${messageBox.textContent}"`);
-      
-      await Logger.log('🔐 [CRYPTO] 📤 Attempting to send...');
-      
       // Try to find enabled send button
       let sendButton = null;
       const sendSelectors = [
@@ -403,17 +469,13 @@ class DiscordCryptochat {
       for (const selector of sendSelectors) {
         sendButton = document.querySelector(selector);
         if (sendButton) {
-          await Logger.log(`🔐 [CRYPTO] 🖱️ Found enabled send button: ${selector}`);
           break;
         }
       }
       
       if (sendButton) {
         sendButton.click();
-        await Logger.log('🔐 [CRYPTO] ✅ Send button clicked');
       } else {
-        await Logger.log('🔐 [CRYPTO] ⌨️ No enabled send button found, using Enter...');
-        
         // Simulate Enter key
         const enterEvent = new KeyboardEvent('keydown', {
           key: 'Enter',
@@ -426,17 +488,16 @@ class DiscordCryptochat {
         messageBox.dispatchEvent(enterEvent);
       }
       
-      await Logger.log('🔐 [CRYPTO] ✅ Send attempt completed');
-      
-      // Clear the processing flag after a delay
-      setTimeout(async () => {
+      // Clear the processing flag after a shorter delay to allow faster typing
+      setTimeout(() => {
         this.isProcessingMessage = false;
-        await Logger.log('🔐 [CRYPTO] ✅ Processing complete, ready for next message');
-      }, 2000);
+      }, 1000);
+      
+      // Immediately trigger decryption scan to show the user their decrypted message
+      this.triggerImmediateDecryption();
       
     } catch (error) {
       this.isProcessingMessage = false;
-      await Logger.log('🔐 [CRYPTO] ❌ Failed to encrypt message: ' + error.message);
       this.showError('Failed to encrypt message. Please check your encryption key.');
     }
   }
@@ -452,20 +513,20 @@ class DiscordCryptochat {
   }
 
   async startPeriodicDecryption() {
-    // Scan immediately on load
-    setTimeout(() => this.scanAllMessages(), 1000);
+    // Scan immediately on load with configurable delay
+    setTimeout(() => this.scanAllMessages(), this.initialDelay);
     
-    // Use adaptive scanning frequency based on activity
+    // Use configurable scanning frequency with adaptive behavior
     this.lastScanTime = Date.now();
-    this.scanFrequency = 3000; // Start with 3 seconds
-    this.maxScanFrequency = 10000; // Max 10 seconds when idle
-    this.minScanFrequency = 1000; // Min 1 second when active
     
     this.decryptionInterval = setInterval(() => {
       this.adaptiveScanAllMessages();
     }, this.scanFrequency);
     
-    await Logger.log('🔐 [CRYPTO] ✅ Adaptive message scanning started');
+    // Also periodically refresh key from storage (backup method)
+    this.keyRefreshInterval = setInterval(() => {
+      this.forceRefreshKey();
+    }, 15000); // Every 15 seconds
   }
 
   async adaptiveScanAllMessages() {
@@ -493,6 +554,34 @@ class DiscordCryptochat {
     }
     
     this.lastScanTime = now;
+  }
+
+  restartDecryptionWithNewSpeed() {
+    // Clear existing intervals
+    if (this.decryptionInterval) {
+      clearInterval(this.decryptionInterval);
+    }
+    
+    // Restart with new speed settings
+    this.decryptionInterval = setInterval(() => {
+      this.adaptiveScanAllMessages();
+    }, this.scanFrequency);
+  }
+
+  triggerImmediateDecryption() {
+    // Multiple scan attempts to catch the newly sent message
+    // Discord may take a moment to render the message in the DOM
+    
+    // Immediate scan
+    setTimeout(() => this.scanAllMessages(), 100);
+    
+    // Quick follow-up scans to catch the message as it appears
+    setTimeout(() => this.scanAllMessages(), 300);
+    setTimeout(() => this.scanAllMessages(), 600);
+    setTimeout(() => this.scanAllMessages(), 1000);
+    
+    // Final scan to ensure we got it
+    setTimeout(() => this.scanAllMessages(), 2000);
   }
 
   async scanAllMessages() {
@@ -530,9 +619,7 @@ class DiscordCryptochat {
         }
       }
       
-      if (decryptedCount > 0) {
-        await Logger.log(`🔐 [CRYPTO] 🔓 Scan complete: ${decryptedCount} decrypted, ${processedCount} processed, ${skippedCount} skipped (${messageContainers.length} total)`);
-      }
+
       
       return { processedCount, decryptedCount, skippedCount, totalMessages: messageContainers.length };
       
@@ -582,7 +669,7 @@ class DiscordCryptochat {
         subtree: true
       });
 
-      await Logger.log('🔐 [CRYPTO] ✅ Real-time message observer setup complete');
+
     };
 
     setupObserver();
@@ -606,6 +693,11 @@ class DiscordCryptochat {
       return { processed: false, decrypted: false, skipped: false };
     }
 
+    // Store original encrypted content before processing
+    if (!messageContent.dataset.originalEncrypted) {
+      messageContent.dataset.originalEncrypted = messageText;
+    }
+
     try {
       // Decode the stealth message to get base64
       const encryptedPayload = this.decodeStealthMessage(messageText);
@@ -619,13 +711,14 @@ class DiscordCryptochat {
       // Add visual indicator
       this.addDecryptionIndicator(messageContent);
       
-      // Mark as processed
+      // Mark as processed and store the decrypted key hash for validation
       messageContent.dataset.cryptoProcessed = 'true';
+      messageContent.dataset.decryptedWithKey = this.encryptionKey ? this.encryptionKey.substring(0, 16) : '';
       
       return { processed: true, decrypted: true, skipped: false };
       
     } catch (error) {
-      // Add error indicator for failed decryption
+      // Restore original encrypted content and show error
       messageContent.textContent = '🔒 [Encrypted message - decryption failed]';
       messageContent.style.color = '#ff6b6b';
       messageContent.style.fontStyle = 'italic';
@@ -869,9 +962,7 @@ class DiscordCryptochat {
     // Also add minimum length check to avoid false positives
     const isEncrypted = ratio > 0.7 && textWithoutSpaces.length >= 10;
     
-    if (isEncrypted) {
-      console.log(`🔐 [CRYPTO] Detected encrypted message: "${text.substring(0, 50)}..." (${chineseCount}/${textWithoutSpaces.length} = ${(ratio*100).toFixed(1)}%)`);
-    }
+
     
     return isEncrypted;
   }

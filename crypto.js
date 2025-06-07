@@ -7,6 +7,11 @@ class DiscordCrypto {
   constructor() {
     this.algorithm = 'AES-GCM';
     this.keyLength = 256;
+    this.keyRotationCheckInterval = 10000; // Check every 10 seconds minimum
+    this.lastKeyRotationCheck = 0;
+    
+    // Start key rotation monitoring
+    // Key rotation monitoring is now handled by background.js
   }
 
   /**
@@ -345,6 +350,290 @@ class DiscordCrypto {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Key Rotation System
+   */
+  startKeyRotationMonitoring() {
+    // Check immediately on startup
+    setTimeout(() => this.checkAndRotateKey(), 1000);
+    
+    // Then check every 10 seconds
+    setInterval(() => this.checkAndRotateKey(), this.keyRotationCheckInterval);
+    
+    console.log('🔐 [CRYPTO] 🔄 Key rotation monitoring started');
+  }
+
+  async checkAndRotateKey() {
+    try {
+      const now = Date.now();
+      
+      // Don't check too frequently
+      if (now - this.lastKeyRotationCheck < this.keyRotationCheckInterval) {
+        return;
+      }
+      
+      this.lastKeyRotationCheck = now;
+      
+      const settings = await this.getKeyRotationSettings();
+      if (!settings.enabled || !settings.baseKey || !settings.intervalMs) {
+        return; // Key rotation not configured
+      }
+      
+      const currentKey = await this.getCurrentRotatedKey(settings);
+      const storedKey = await this.getStoredKey();
+      
+      if (currentKey !== storedKey) {
+        console.log('🔐 [CRYPTO] 🔄 Key rotation needed - updating key');
+        await this.storeKey(currentKey);
+        
+        // Security: Delete base key after first rotation for perfect forward secrecy
+        await this.deleteBaseKeyAfterFirstRotation(settings);
+        
+        // Notify all content scripts about key update
+        this.notifyContentScriptsKeyUpdate(currentKey);
+        
+        // Notify user
+        if (typeof Logger !== 'undefined') {
+          await Logger.log('🔐 [CRYPTO] 🔄 Key automatically rotated based on time interval');
+        }
+      }
+      
+    } catch (error) {
+      console.error('🔐 [CRYPTO] ❌ Key rotation check failed:', error);
+    }
+  }
+
+  async getCurrentRotatedKey(settings) {
+    const { baseKey, intervalMs, startTimestamp } = settings;
+    const now = Date.now();
+    const elapsed = now - startTimestamp;
+    const rotationsNeeded = Math.floor(elapsed / intervalMs);
+    
+    console.log(`🔐 [CRYPTO] 🔄 Calculating enhanced key rotation: ${rotationsNeeded} rotations needed`);
+    
+    // Enhanced rotation with entropy injection
+    let currentKey = baseKey;
+    for (let i = 0; i < rotationsNeeded; i++) {
+      // Calculate the exact timestamp for this rotation
+      const rotationTimestamp = startTimestamp + (i + 1) * intervalMs;
+      
+      // Inject entropy based on rotation timestamp and interval
+      const entropy = await this.generateRotationEntropy(rotationTimestamp, intervalMs, i);
+      
+      // Combine current key with entropy and hash
+      currentKey = await this.hashKeyWithEntropy(currentKey, entropy);
+    }
+    
+    return currentKey;
+  }
+
+  async generateRotationEntropy(rotationTimestamp, intervalMs, rotationNumber) {
+    // Generate deterministic but unpredictable entropy
+    // Both users will generate the same entropy for the same rotation
+    
+    // Use multiple entropy sources
+    const timeFactor = Math.floor(rotationTimestamp / intervalMs); // Rotation period number
+    const dateFactor = new Date(rotationTimestamp).toISOString().substring(0, 10); // YYYY-MM-DD
+    const hourFactor = Math.floor(rotationTimestamp / 3600000); // Hour since epoch
+    const intervalFactor = intervalMs.toString(); // Interval as string
+    const rotationFactor = rotationNumber.toString(); // Rotation sequence number
+    
+    // Combine all factors into entropy string
+    const entropyString = `${timeFactor}:${dateFactor}:${hourFactor}:${intervalFactor}:${rotationFactor}`;
+    
+    // Hash the entropy string
+    const encoder = new TextEncoder();
+    const data = encoder.encode(entropyString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    // Return first 16 bytes as hex (32 chars)
+    return Array.from(hashArray.slice(0, 16))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async hashKeyWithEntropy(key, entropy) {
+    // Combine key and entropy in a specific pattern
+    const combinedString = `${key}::${entropy}::${key.length}::${entropy.length}`;
+    
+    // Hash the combined string
+    const encoder = new TextEncoder();
+    const data = encoder.encode(combinedString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    // Convert to hex string
+    return Array.from(hashArray)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async hashKey(key) {
+    // Hash the key using SHA-256
+    const encoder = new TextEncoder();
+    const data = encoder.encode(key);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    // Convert to hex string
+    return Array.from(hashArray)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async getKeyRotationSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get([
+        'keyRotationEnabled',
+        'keyRotationBaseKey', 
+        'keyRotationIntervalMs',
+        'keyRotationStartTimestamp'
+      ], (result) => {
+        resolve({
+          enabled: result.keyRotationEnabled || false,
+          baseKey: result.keyRotationBaseKey || null,
+          intervalMs: result.keyRotationIntervalMs || 0,
+          startTimestamp: result.keyRotationStartTimestamp || Date.now()
+        });
+      });
+    });
+  }
+
+  async setupKeyRotation(baseKey, intervalMs) {
+    const startTimestamp = Date.now();
+    
+    await new Promise((resolve) => {
+      chrome.storage.local.set({
+        keyRotationEnabled: true,
+        keyRotationBaseKey: baseKey,
+        keyRotationIntervalMs: intervalMs,
+        keyRotationStartTimestamp: startTimestamp,
+        encryptionKey: baseKey // Set initial key
+      }, resolve);
+    });
+    
+    console.log(`🔐 [CRYPTO] 🔄 Key rotation setup: ${intervalMs}ms intervals`);
+    
+    // Force immediate check
+    setTimeout(() => this.checkAndRotateKey(), 100);
+  }
+
+  async disableKeyRotation() {
+    await new Promise((resolve) => {
+      chrome.storage.local.set({
+        keyRotationEnabled: false
+      }, resolve);
+    });
+    
+    console.log('🔐 [CRYPTO] 🔄 Key rotation disabled');
+  }
+
+  formatRotationInterval(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    
+    if (weeks > 0) return `${weeks} week${weeks > 1 ? 's' : ''}`;
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    return `${seconds} second${seconds > 1 ? 's' : ''}`;
+  }
+
+  async deleteBaseKeyAfterFirstRotation(settings) {
+    const now = Date.now();
+    const elapsed = now - settings.startTimestamp;
+    const rotationsCompleted = Math.floor(elapsed / settings.intervalMs);
+    
+    // Delete base key after first rotation for security
+    if (rotationsCompleted > 0) {
+      const hasBaseKey = await new Promise(resolve => {
+        chrome.storage.local.get(['keyRotationBaseKey'], result => {
+          resolve(!!result.keyRotationBaseKey);
+        });
+      });
+      
+      if (hasBaseKey) {
+        await new Promise(resolve => {
+          chrome.storage.local.remove(['keyRotationBaseKey'], () => {
+            console.log('🔐 [CRYPTO] 🗑️ Base key securely deleted after first rotation');
+            resolve();
+          });
+        });
+      }
+    }
+  }
+
+  notifyContentScriptsKeyUpdate(newKey) {
+    // Notify all content scripts about the key update
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.url && tab.url.includes('discord.com')) {
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'keyRotated',
+              newKey: newKey
+            }).catch(() => {
+              // Tab might not have content script, ignore error
+            });
+          }
+        });
+      });
+    }
+  }
+
+  // ==================== SYNC SUPPORT ====================
+
+  async generateSyncCode(baseKey, intervalMs, startTimestamp) {
+    const currentTimestamp = Date.now();
+    const rotationsCompleted = Math.floor((currentTimestamp - startTimestamp) / intervalMs);
+    
+    const syncData = {
+      version: 1,
+      baseKeyHash: await this.hashKey(baseKey), 
+      startTimestamp: startTimestamp,
+      intervalMs: intervalMs,
+      currentTimestamp: currentTimestamp,
+      rotationsCompleted: rotationsCompleted
+    };
+
+    // Encrypt with base key
+    const syncJson = JSON.stringify(syncData);
+    const encryptedSync = await this.encrypt(syncJson, baseKey);
+    
+    return `DSYNC1:${encryptedSync}`;
+  }
+
+  async applySyncCode(syncCode, currentBaseKey) {
+    if (!syncCode.startsWith('DSYNC1:')) {
+      throw new Error('Invalid sync code format');
+    }
+
+    const encryptedData = syncCode.substring(7);
+    const decryptedJson = await this.decrypt(encryptedData, currentBaseKey);
+    const syncData = JSON.parse(decryptedJson);
+
+    if (syncData.version !== 1) {
+      throw new Error('Unsupported sync code version');
+    }
+
+    // Verify base key matches
+    const currentKeyHash = await this.hashKey(currentBaseKey);
+    if (currentKeyHash !== syncData.baseKeyHash) {
+      throw new Error('Base key mismatch - ensure both users have the same base key');
+    }
+
+    return {
+      startTimestamp: syncData.startTimestamp,
+      intervalMs: syncData.intervalMs,
+      timeDifference: Math.abs(Date.now() - syncData.currentTimestamp),
+      rotationsCompleted: syncData.rotationsCompleted
+    };
   }
 }
 

@@ -273,6 +273,152 @@
             </button>
         </form>
 
+        <!-- Key Rotation Section -->
+        <div class="key-info">
+            <div class="key-info-title">🔄 Key Rotation (Perfect Forward Secrecy)</div>
+            <div class="help-text" style="margin-bottom: 16px;">
+                Automatically rotate your encryption key based on time intervals. Each rotation uses a one-way hash, 
+                ensuring old keys cannot be recovered even if your current key is compromised.
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="enable-rotation" style="margin-right: 8px;">
+                    <span>Enable automatic key rotation</span>
+                </label>
+            </div>
+
+            <div id="rotation-settings" style="display: none;">
+                <div style="margin-bottom: 12px;">
+                    <label class="label" style="font-size: 14px;">Base Key (Starting Point)</label>
+                    <input type="password" id="base-key" class="input" placeholder="Enter your master key (16-256 chars)..." style="font-size: 14px; padding: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                        ⚠️ Minimum 16 characters. Will be cleared after setup for security.
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label class="label" style="font-size: 14px;">Rotation Interval</label>
+                    <select id="rotation-interval" class="input" style="font-size: 14px; padding: 10px;">
+                        <option value="10000">10 Seconds (Testing)</option>
+                        <option value="60000">1 Minute</option>
+                        <option value="3600000">1 Hour</option>
+                        <option value="86400000">1 Day</option>
+                        <option value="604800000" selected>1 Week</option>
+                        <option value="2629746000">1 Month</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+
+                                    <div id="custom-interval" style="display: none; margin-bottom: 12px;">
+                        <label class="label" style="font-size: 14px;">Custom Interval (seconds)</label>
+                        <input type="number" id="custom-seconds" class="input" min="10" placeholder="3600" style="font-size: 14px; padding: 10px;">
+                        <div style="font-size: 12px; color: #666; margin-top: 4px;">Minimum: 10 seconds</div>
+                    </div>
+
+                <button id="setup-rotation" class="button" style="margin-bottom: 8px;">
+                    🔄 Setup Key Rotation
+                </button>
+
+                <div id="rotation-status" style="font-size: 12px; color: #666;"></div>
+            </div>
+        </div>
+
+        <!-- Sync Section -->
+        <div class="key-info">
+            <div class="key-info-title">🔄 Sync with Friend</div>
+            <div class="help-text" style="margin-bottom: 16px;">
+                Generate an encrypted sync code to perfectly synchronize key rotation timing with your friend.
+                Both users will have identical key rotation schedules after syncing.
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">📡 How to Sync</div>
+                <div style="font-size: 13px; color: #856404; line-height: 1.4;">
+                    1. Click "Generate Sync Code" below<br>
+                    2. Copy and share the code with your friend<br>
+                    3. Your friend pastes it and clicks "Apply Sync"<br>
+                    4. Both will have perfectly synchronized rotations
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <button id="generate-sync" class="button secondary" style="font-size: 14px; padding: 12px;">
+                    📡 Generate Sync Code
+                </button>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label class="label" style="font-size: 14px; margin-bottom: 8px; display: block;">Your Sync Code (Share This)</label>
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <textarea id="sync-code-output" readonly class="input" style="flex: 1; resize: vertical; min-height: 80px; max-height: 120px; font-family: 'Courier New', monospace; font-size: 10px; background: #f8f9fa; line-height: 1.2; word-break: break-all;" placeholder="Click 'Generate Sync Code' above"></textarea>
+                    <button id="copy-sync-code" class="button" style="width: 80px; height: 40px; font-size: 11px; padding: 8px; background: #6c757d; margin-top: 0;" disabled>
+                        📋<br>Copy
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label class="label" style="font-size: 14px; margin-bottom: 8px; display: block;">Apply Friend's Sync Code</label>
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <textarea id="sync-code-input" class="input" style="flex: 1; resize: vertical; min-height: 80px; max-height: 120px; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.2; word-break: break-all;" placeholder="Paste your friend's sync code here"></textarea>
+                    <button id="apply-sync-code" class="button" style="width: 80px; height: 40px; font-size: 11px; padding: 8px; background: #17a2b8; margin-top: 0;">
+                        🔄<br>Apply
+                    </button>
+                </div>
+            </div>
+
+            <div id="sync-status" style="font-size: 12px; color: #666; display: none;"></div>
+            
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
+                <button id="debug-sync" class="button secondary" style="font-size: 12px; padding: 8px; background: #6c757d;">
+                    🔍 Debug Sync Keys
+                </button>
+                <div id="debug-output" style="font-size: 10px; color: #666; margin-top: 8px; font-family: monospace; max-height: 100px; overflow-y: auto; display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Decryption Speed Section -->
+        <div class="key-info">
+            <div class="key-info-title">⚡ Decryption Speed Settings</div>
+            <div class="help-text" style="margin-bottom: 16px;">
+                Configure how fast the extension scans for encrypted messages. Faster scanning = quicker decryption but more CPU usage.
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <label class="label" style="font-size: 14px;">Scan Frequency</label>
+                <select id="scan-frequency" class="input" style="font-size: 14px; padding: 10px;">
+                    <option value="500">⚡ Ultra Fast (0.5s) - High CPU</option>
+                    <option value="1000" selected>🚀 Fast (1s) - Recommended</option>
+                    <option value="2000">⚖️ Balanced (2s) - Default</option>
+                    <option value="3000">🐌 Slow (3s) - Low CPU</option>
+                    <option value="5000">🦴 Very Slow (5s) - Minimal CPU</option>
+                </select>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    How often to scan Discord for encrypted messages. Lower = faster decryption.
+                </div>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label class="label" style="font-size: 14px;">Initial Load Delay</label>
+                <select id="initial-delay" class="input" style="font-size: 14px; padding: 10px;">
+                    <option value="100">⚡ Instant (0.1s)</option>
+                    <option value="500" selected>🚀 Fast (0.5s)</option>
+                    <option value="1000">⚖️ Normal (1s)</option>
+                    <option value="2000">🐌 Slow (2s)</option>
+                </select>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    How long to wait before starting decryption after loading a chat.
+                </div>
+            </div>
+
+            <button id="save-speed-settings" class="button secondary" style="font-size: 14px; padding: 12px;">
+                ⚡ Save Speed Settings
+            </button>
+
+            <div id="speed-status" style="font-size: 12px; color: #666; margin-top: 8px;"></div>
+        </div>
+
         <div id="key-info" class="key-info" style="display: none;">
             <div class="key-info-title">🔑 Key Information</div>
             <div class="help-text">Key Fingerprint (SHA-256):</div>
