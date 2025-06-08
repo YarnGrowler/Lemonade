@@ -60,7 +60,7 @@ class DiscordCryptochat {
     this.messageObserver = null;
     this.lastProcessedMessage = null;
     this.autoEncryptEnabled = false;
-    this.version = "1.3.0";
+    this.version = "2.0.0";
     
     // Add method binding to ensure 'this' context
     this.isAlreadyEncrypted = this.isAlreadyEncrypted.bind(this);
@@ -85,9 +85,12 @@ class DiscordCryptochat {
     try {
       this.encryptionKey = await discordCrypto.getStoredKey();
       
-      // Load auto-encrypt setting
-      const result = await chrome.storage.local.get(['autoEncryptEnabled']);
+      // Load auto-encrypt and asymmetric settings
+      const result = await chrome.storage.local.get(['autoEncryptEnabled', 'asymmetricEnabled']);
       this.autoEncryptEnabled = result.autoEncryptEnabled || false;
+      this.asymmetricEnabled = result.asymmetricEnabled || false;
+      
+      console.log('🔐 [CRYPTO] Settings loaded - Auto-encrypt:', this.autoEncryptEnabled, 'Asymmetric:', this.asymmetricEnabled);
       
       if (!this.encryptionKey) {
         this.showKeyWarning();
@@ -168,6 +171,25 @@ class DiscordCryptochat {
     // Setup incoming message decryption
     await this.setupIncomingMessageDecryption();
     
+    // Initialize asymmetric encryption
+    console.log('🔐 [CRYPTO] Attempting to initialize asymmetric encryption...');
+    try {
+      if (typeof this.initAsymmetricEncryption === 'function') {
+        this.initAsymmetricEncryption();
+        console.log('🔐 [CRYPTO] initAsymmetricEncryption() called');
+      } else {
+        console.log('🔐 [CRYPTO] ❌ initAsymmetricEncryption method not found!');
+        console.log('🔐 [CRYPTO] Available methods:', Object.getOwnPropertyNames(this.__proto__));
+      }
+    } catch (error) {
+      console.error('🔐 [CRYPTO] ❌ Asymmetric initialization error:', error);
+    }
+    
+    // Debug: Check asymmetric status after a delay
+    setTimeout(() => {
+      this.debugAsymmetricStatus();
+    }, 2000);
+    
     // Add extension indicator
     this.addExtensionIndicator();
   }
@@ -182,6 +204,14 @@ class DiscordCryptochat {
         
         // Send confirmation back
         sendResponse({ success: true, autoEncryptEnabled: this.autoEncryptEnabled });
+      } else if (request.action === 'updateCurrentUser') {
+        // Update current user info for asymmetric encryption
+        if (window.ecCrypto) {
+          window.ecCrypto.setCurrentUser(request.userId, request.username);
+          console.log('🔐 [CRYPTO] 👤 Current user updated:', request.username, '(ID:', request.userId + ')');
+        }
+        
+        sendResponse({ success: true });
       } else if (request.action === 'keyRotated') {
         // Update the encryption key in real-time
         this.encryptionKey = request.newKey;
@@ -383,13 +413,6 @@ class DiscordCryptochat {
       // Continue anyway - better to attempt encryption than fail completely
     }
 
-    if (!this.encryptionKey) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.showKeyWarning();
-      return;
-    }
-
     // Extract the actual message (remove !priv prefix if present)
     const actualMessage = messageText.startsWith('!priv ') ? 
       messageText.substring(6).trim() : messageText.trim();
@@ -406,8 +429,55 @@ class DiscordCryptochat {
       event.stopPropagation();
       event.stopImmediatePropagation(); // Prevent other listeners
 
-      const encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
-      const finalMessage = this.encodeStealthMessage(encryptedMessage);
+      let encryptedMessage = null;
+      let encryptionMethod = 'unknown';
+      let encryptionDetails = {};
+
+      console.log('🔐 [ENCRYPT] 📤 Encrypting outgoing message...');
+      console.log('🔐 [ENCRYPT] Original message:', actualMessage);
+
+      // Try asymmetric encryption first if available
+      if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+        console.log('🔐 [ENCRYPT] 🔐 Trying asymmetric encryption...');
+        try {
+          const asymmetricResult = await this.encryptAsymmetricMessage(actualMessage);
+          if (asymmetricResult && asymmetricResult.success) {
+            encryptedMessage = asymmetricResult.encryptedText;
+            encryptionMethod = 'asymmetric';
+            encryptionDetails = asymmetricResult.details || {};
+            console.log('🔐 [ENCRYPT] ✅ Asymmetric encryption SUCCESS!');
+            console.log('🔐 [ENCRYPT] Details:', encryptionDetails);
+            console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+          } else {
+            console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption failed, trying symmetric...');
+          }
+        } catch (asymmetricError) {
+          console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error:', asymmetricError.message);
+        }
+      } else {
+        console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available');
+      }
+
+      // Fallback to symmetric encryption if asymmetric failed or unavailable
+      if (!encryptedMessage) {
+        if (!this.encryptionKey) {
+          console.log('🔐 [ENCRYPT] ❌ No symmetric encryption key available');
+          event.preventDefault();
+          event.stopPropagation();
+          this.showKeyWarning();
+          this.isProcessingMessage = false;
+          return;
+        }
+        
+        console.log('🔐 [ENCRYPT] 🔑 Using symmetric encryption...');
+        encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
+        encryptionMethod = 'symmetric';
+        encryptionDetails = { keyType: 'shared_secret' };
+        console.log('🔐 [ENCRYPT] ✅ Symmetric encryption SUCCESS!');
+        console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+      }
+
+      const finalMessage = encryptionMethod === 'asymmetric' ? encryptedMessage : this.encodeStealthMessage(encryptedMessage);
       
       // Focus the message box
       messageBox.focus();
@@ -676,8 +746,8 @@ class DiscordCryptochat {
   }
 
   async processMessageContent(messageContent) {
-    // Return early if no encryption key or already processed
-    if (!this.encryptionKey || !messageContent) {
+    // Return early if already processed
+    if (!messageContent) {
       return { processed: false, decrypted: false, skipped: false };
     }
 
@@ -699,26 +769,75 @@ class DiscordCryptochat {
     }
 
     try {
-      // Decode the stealth message to get base64
-      const encryptedPayload = this.decodeStealthMessage(messageText);
+      let decryptedMessage = null;
+      let decryptionMethod = 'unknown';
+      let decryptionDetails = {};
       
-      // Decrypt the message
-      const decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
+      console.log('🔐 [DECRYPT] 📨 Processing encrypted message...');
+      console.log('🔐 [DECRYPT] Message preview:', messageText.substring(0, 100) + '...');
       
-      // Replace the message content
-      messageContent.textContent = decryptedMessage;
+      // Try asymmetric decryption first if available
+      if (this.processAsymmetricMessage && typeof this.processAsymmetricMessage === 'function') {
+        console.log('🔐 [DECRYPT] 🔐 Trying asymmetric decryption...');
+        try {
+          const asymmetricResult = await this.processAsymmetricMessage(messageText, messageContent);
+          if (asymmetricResult && asymmetricResult.success) {
+            decryptedMessage = asymmetricResult.decryptedText;
+            decryptionMethod = 'asymmetric';
+            decryptionDetails = asymmetricResult.details || {};
+            console.log('🔐 [DECRYPT] ✅ Asymmetric decryption SUCCESS!');
+            console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
+            console.log('🔐 [DECRYPT] Details:', decryptionDetails);
+          } else {
+            console.log('🔐 [DECRYPT] ❌ Asymmetric decryption failed, trying symmetric...');
+          }
+        } catch (asymmetricError) {
+          console.log('🔐 [DECRYPT] ❌ Asymmetric decryption error:', asymmetricError.message);
+        }
+      } else {
+        console.log('🔐 [DECRYPT] ⚠️ Asymmetric decryption not available');
+      }
       
-      // Add visual indicator
-      this.addDecryptionIndicator(messageContent);
+      // Fallback to symmetric decryption if asymmetric failed or unavailable
+      if (!decryptedMessage && this.encryptionKey) {
+        console.log('🔐 [DECRYPT] 🔑 Trying symmetric decryption...');
+        try {
+          // Decode the stealth message to get base64
+          const encryptedPayload = this.decodeStealthMessage(messageText);
+          console.log('🔐 [DECRYPT] Decoded payload length:', encryptedPayload.length);
+          
+          // Decrypt the message using symmetric encryption
+          decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
+          decryptionMethod = 'symmetric';
+          decryptionDetails = { keyType: 'shared_secret' };
+          console.log('🔐 [DECRYPT] ✅ Symmetric decryption SUCCESS!');
+          console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
+        } catch (symmetricError) {
+          console.log('🔐 [DECRYPT] ❌ Symmetric decryption failed:', symmetricError.message);
+        }
+      } else if (!this.encryptionKey) {
+        console.log('🔐 [DECRYPT] ⚠️ No symmetric encryption key available');
+      }
       
-      // Mark as processed and store the decrypted key hash for validation
-      messageContent.dataset.cryptoProcessed = 'true';
-      messageContent.dataset.decryptedWithKey = this.encryptionKey ? this.encryptionKey.substring(0, 16) : '';
-      
-      return { processed: true, decrypted: true, skipped: false };
+      if (decryptedMessage) {
+        // Replace the message content
+        messageContent.textContent = decryptedMessage;
+        
+        // Add visual indicator with method info
+        this.addDecryptionIndicator(messageContent, decryptionMethod);
+        
+        // Mark as processed
+        messageContent.dataset.cryptoProcessed = 'true';
+        messageContent.dataset.decryptionMethod = decryptionMethod;
+        messageContent.dataset.decryptedWithKey = this.encryptionKey ? this.encryptionKey.substring(0, 16) : '';
+        
+        return { processed: true, decrypted: true, skipped: false };
+      } else {
+        throw new Error('Both asymmetric and symmetric decryption failed');
+      }
       
     } catch (error) {
-      // Restore original encrypted content and show error
+      // Show decryption failure
       messageContent.textContent = '🔒 [Encrypted message - decryption failed]';
       messageContent.style.color = '#ff6b6b';
       messageContent.style.fontStyle = 'italic';
@@ -728,19 +847,30 @@ class DiscordCryptochat {
     }
   }
 
-  addDecryptionIndicator(messageContent) {
+  addDecryptionIndicator(messageContent, method = 'unknown') {
     // Add a small lock icon to indicate decrypted message
     if (!messageContent.querySelector('.crypto-indicator')) {
       const indicator = document.createElement('span');
       indicator.className = 'crypto-indicator';
-      indicator.innerHTML = '🔓';
+      
+      // Different icons for different methods
+      if (method === 'asymmetric') {
+        indicator.innerHTML = '🔐'; // Key icon for asymmetric
+        indicator.title = 'Decrypted with asymmetric encryption (EC)';
+      } else if (method === 'symmetric') {
+        indicator.innerHTML = '🔓'; // Unlock icon for symmetric
+        indicator.title = 'Decrypted with symmetric encryption';
+      } else {
+        indicator.innerHTML = '🔓';
+        indicator.title = 'Decrypted message';
+      }
+      
       indicator.style.cssText = `
         font-size: 12px;
         margin-left: 5px;
         opacity: 0.7;
         vertical-align: super;
       `;
-      indicator.title = 'Decrypted message';
       messageContent.appendChild(indicator);
     }
   }
@@ -866,6 +996,164 @@ class DiscordCryptochat {
     chrome.runtime.sendMessage({ action: 'openOptions' });
   }
 
+  // Initialize asymmetric encryption system
+  async initAsymmetricEncryption() {
+    console.log('🔐 [ASYMMETRIC] Initializing asymmetric encryption system...');
+    
+    const maxRetries = 10;
+    let retryCount = 0;
+    
+    const attemptInit = async () => {
+      try {
+        retryCount++;
+        console.log(`🔐 [ASYMMETRIC] Attempt ${retryCount}/${maxRetries}...`);
+        
+        // Check if all required classes are available
+        if (typeof AsymmetricContentIntegration === 'undefined') {
+          console.log('🔐 [ASYMMETRIC] ❌ AsymmetricContentIntegration class not found');
+          if (retryCount < maxRetries) {
+            setTimeout(attemptInit, 500);
+            return;
+          } else {
+            console.log('🔐 [ASYMMETRIC] ❌ Max retries reached - AsymmetricContentIntegration not available');
+            return;
+          }
+        }
+        
+        // Check if global objects are ready
+        if (!window.ecCrypto || !window.ecMessageProcessor) {
+          console.log('🔐 [ASYMMETRIC] ⏳ Waiting for global objects...', {
+            ecCrypto: !!window.ecCrypto,
+            ecMessageProcessor: !!window.ecMessageProcessor
+          });
+          if (retryCount < maxRetries) {
+            setTimeout(attemptInit, 500);
+            return;
+          }
+        }
+        
+        // Initialize asymmetric content integration
+        console.log('🔐 [ASYMMETRIC] 🚀 Creating AsymmetricContentIntegration...');
+        this.asymmetric = new AsymmetricContentIntegration(this);
+        
+        // Wait for initialization
+        console.log('🔐 [ASYMMETRIC] ⏳ Initializing...');
+        const success = await this.asymmetric.initialize();
+        
+        if (success && this.asymmetric.isInitialized) {
+          // Bind methods to this context
+          this.processAsymmetricMessage = this.asymmetric.processIncomingMessage.bind(this.asymmetric);
+          this.encryptAsymmetricMessage = this.asymmetric.encryptOutgoingMessage.bind(this.asymmetric);
+          
+          console.log('🔐 [ASYMMETRIC] ✅ Asymmetric encryption fully initialized!');
+          console.log('🔐 [ASYMMETRIC] processAsymmetricMessage available:', typeof this.processAsymmetricMessage);
+          console.log('🔐 [ASYMMETRIC] encryptAsymmetricMessage available:', typeof this.encryptAsymmetricMessage);
+          
+          // Show success notification
+          Logger.showPageNotification('🔐 Asymmetric encryption ready!', 'success');
+          
+        } else {
+          console.log('🔐 [ASYMMETRIC] ❌ Initialization failed - success:', success, 'initialized:', this.asymmetric?.isInitialized);
+          if (retryCount < maxRetries) {
+            setTimeout(attemptInit, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('🔐 [ASYMMETRIC] ❌ Initialization error:', error);
+        if (retryCount < maxRetries) {
+          setTimeout(attemptInit, 1000);
+        }
+      }
+    };
+    
+    // Start the initialization process
+    setTimeout(attemptInit, 500);
+  }
+
+  debugAsymmetricStatus() {
+    console.log('🔐 [DEBUG] === ASYMMETRIC STATUS DEBUG ===');
+    console.log('🔐 [DEBUG] Settings - Asymmetric enabled:', this.asymmetricEnabled);
+    console.log('🔐 [DEBUG] Has asymmetric object:', !!this.asymmetric);
+    console.log('🔐 [DEBUG] Extension version:', this.version);
+    console.log('🔐 [DEBUG] Has initAsymmetricEncryption method:', typeof this.initAsymmetricEncryption);
+    
+    if (this.asymmetric) {
+      console.log('🔐 [DEBUG] Asymmetric initialized:', this.asymmetric.isInitialized);
+      console.log('🔐 [DEBUG] Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
+      console.log('🔐 [DEBUG] Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
+      
+      if (this.asymmetric.isInitialized) {
+        const status = this.asymmetric.getAsymmetricStatus();
+        console.log('🔐 [DEBUG] Asymmetric status:', status);
+        
+        // Try to get contact list
+        try {
+          const contacts = this.asymmetric.getContactList();
+          console.log('🔐 [DEBUG] Contact count:', contacts.length);
+          if (contacts.length > 0) {
+            console.log('🔐 [DEBUG] First contact:', contacts[0]);
+          }
+        } catch (error) {
+          console.log('🔐 [DEBUG] Error getting contacts:', error);
+        }
+      }
+    } else {
+      console.log('🔐 [DEBUG] Asymmetric object not created - trying to reinitialize...');
+      
+      // Try to force reinitialize if methods are available but object isn't created
+      if (typeof this.initAsymmetricEncryption === 'function') {
+        console.log('🔐 [DEBUG] Retrying initAsymmetricEncryption...');
+        try {
+          this.initAsymmetricEncryption();
+          
+          // Check again after a delay
+          setTimeout(() => {
+            console.log('🔐 [DEBUG] After retry - Has asymmetric object:', !!this.asymmetric);
+            console.log('🔐 [DEBUG] After retry - Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
+            console.log('🔐 [DEBUG] After retry - Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
+          }, 1000);
+        } catch (error) {
+          console.log('🔐 [DEBUG] Retry failed:', error);
+        }
+      }
+    }
+    
+    // Check if global objects exist
+    console.log('🔐 [DEBUG] Global ecCrypto exists:', typeof window.ecCrypto);
+    console.log('🔐 [DEBUG] Global ecMessageProcessor exists:', typeof window.ecMessageProcessor);
+    console.log('🔐 [DEBUG] Global ECMessageProcessor exists:', typeof ECMessageProcessor);
+    console.log('🔐 [DEBUG] Global AsymmetricContentIntegration exists:', typeof AsymmetricContentIntegration);
+    
+    console.log('🔐 [DEBUG] ================================');
+  }
+
+  // Manual test method - call from console: discordCryptochat.testAsymmetricEncryption()
+  async testAsymmetricEncryption() {
+    console.log('🔐 [TEST] Testing asymmetric encryption...');
+    
+    if (!this.asymmetric || !this.asymmetric.isInitialized) {
+      console.log('🔐 [TEST] Asymmetric not initialized - calling init...');
+      this.initAsymmetricEncryption();
+      
+      // Wait a moment for init
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    this.debugAsymmetricStatus();
+    
+    // Test encryption
+    if (this.encryptAsymmetricMessage) {
+      try {
+        const testMessage = "Hello asymmetric world!";
+        console.log('🔐 [TEST] Encrypting test message:', testMessage);
+        const result = await this.encryptAsymmetricMessage(testMessage);
+        console.log('🔐 [TEST] Encryption result:', result);
+      } catch (error) {
+        console.log('🔐 [TEST] Encryption failed:', error);
+      }
+    }
+  }
+
   // Stealth encoding methods
   encodeStealthMessage(base64Data) {
     // Convert base64 to Chinese characters to make it look natural
@@ -944,7 +1232,7 @@ class DiscordCryptochat {
     
     // Remove spaces to count only Chinese characters
     const textWithoutSpaces = text.replace(/\s+/g, '');
-    if (textWithoutSpaces.length === 0) return false;
+    if (textWithoutSpaces.length < 10) return false;
     
     // Check if most non-space characters are in the CJK range we use
     let chineseCount = 0;
@@ -956,17 +1244,43 @@ class DiscordCryptochat {
     }
     
     // If more than 70% are in our Chinese range, consider it encrypted
-    // Lowered threshold to account for potential compression artifacts
     const ratio = chineseCount / textWithoutSpaces.length;
+    const isEncrypted = ratio > 0.7;
     
-    // Also add minimum length check to avoid false positives
-    const isEncrypted = ratio > 0.7 && textWithoutSpaces.length >= 10;
-    
-
+    console.log('🔐 [CRYPTO] 🔍 Checking if encrypted:', {
+      textLength: text.length,
+      cleanLength: textWithoutSpaces.length,
+      chineseCount: chineseCount,
+      ratio: ratio.toFixed(2),
+      isEncrypted: isEncrypted
+    });
     
     return isEncrypted;
   }
 }
 
 // Initialize when the script loads
-const discordCryptochat = new DiscordCryptochat(); 
+const discordCryptochat = new DiscordCryptochat();
+
+// Global function for manual asymmetric initialization (for debugging)
+window.forceAsymmetricInit = function() {
+  console.log('🔐 [MANUAL] Forcing asymmetric initialization...');
+  console.log('🔐 [MANUAL] DiscordCryptochat available:', typeof DiscordCryptochat);
+  console.log('🔐 [MANUAL] AsymmetricContentIntegration available:', typeof AsymmetricContentIntegration);
+  console.log('🔐 [MANUAL] ecCrypto available:', typeof ecCrypto);
+  console.log('🔐 [MANUAL] ecMessageProcessor available:', typeof ecMessageProcessor);
+  
+  if (discordCryptochat && typeof discordCryptochat.initAsymmetricEncryption === 'function') {
+    discordCryptochat.initAsymmetricEncryption();
+    console.log('🔐 [MANUAL] Called initAsymmetricEncryption');
+    
+    setTimeout(() => {
+      console.log('🔐 [MANUAL] Results after 2s:');
+      console.log('🔐 [MANUAL] Has asymmetric object:', !!discordCryptochat.asymmetric);
+      console.log('🔐 [MANUAL] Has processAsymmetricMessage:', typeof discordCryptochat.processAsymmetricMessage);
+      console.log('🔐 [MANUAL] Has encryptAsymmetricMessage:', typeof discordCryptochat.encryptAsymmetricMessage);
+    }, 2000);
+  } else {
+    console.log('🔐 [MANUAL] ❌ initAsymmetricEncryption not available');
+  }
+}; 

@@ -41,6 +41,15 @@ class OptionsManager {
     // Debug elements
     this.debugSyncButton = document.getElementById('debug-sync');
     this.debugOutput = document.getElementById('debug-output');
+
+    // Asymmetric encryption elements
+    this.enableAsymmetricCheckbox = document.getElementById('enable-asymmetric');
+    this.asymmetricSettings = document.getElementById('asymmetric-settings');
+    this.ecRotationIntervalSelect = document.getElementById('ec-rotation-interval');
+    this.rotateKeysButton = document.getElementById('rotate-keys-now');
+    this.viewContactsButton = document.getElementById('view-contacts');
+    this.asymmetricStatus = document.getElementById('asymmetric-status');
+    this.contactList = document.getElementById('contact-list');
     
     this.init();
   }
@@ -49,6 +58,7 @@ class OptionsManager {
     await this.loadStoredKey();
     await this.loadKeyRotationSettings();
     await this.loadSpeedSettings();
+    await this.loadAsymmetricSettings();
     this.setupEventListeners();
   }
 
@@ -124,6 +134,23 @@ class OptionsManager {
     // Debug event listeners
     this.debugSyncButton.addEventListener('click', async () => {
       await this.debugSyncKeys();
+    });
+
+    // Asymmetric encryption event listeners
+    this.enableAsymmetricCheckbox.addEventListener('change', () => {
+      this.toggleAsymmetricSettings();
+    });
+
+    this.ecRotationIntervalSelect.addEventListener('change', async () => {
+      await this.updateAsymmetricRotationInterval();
+    });
+
+    this.rotateKeysButton.addEventListener('click', async () => {
+      await this.rotateKeysManually();
+    });
+
+    this.viewContactsButton.addEventListener('click', () => {
+      this.toggleContactList();
     });
   }
 
@@ -883,6 +910,265 @@ class OptionsManager {
     return Array.from(hashArray)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
+  }
+
+  // ==================== ASYMMETRIC ENCRYPTION METHODS ====================
+
+  async loadAsymmetricSettings() {
+    try {
+      const result = await chrome.storage.local.get(['ecEnabled', 'ecRotationInterval']);
+      
+      this.enableAsymmetricCheckbox.checked = result.ecEnabled || false;
+      this.ecRotationIntervalSelect.value = (result.ecRotationInterval || 3600000).toString();
+      
+      this.toggleAsymmetricSettings();
+      
+      if (result.ecEnabled) {
+        await this.updateAsymmetricStatus();
+        this.startAsymmetricStatusUpdates();
+      }
+      
+    } catch (error) {
+      console.error('Failed to load asymmetric settings:', error);
+    }
+  }
+
+  toggleAsymmetricSettings() {
+    const isEnabled = this.enableAsymmetricCheckbox.checked;
+    this.asymmetricSettings.style.display = isEnabled ? 'block' : 'none';
+    
+    if (isEnabled) {
+      this.enableAsymmetricMode();
+    } else {
+      this.disableAsymmetricMode();
+    }
+  }
+
+  async enableAsymmetricMode() {
+    try {
+      await chrome.storage.local.set({ ecEnabled: true });
+      
+      // Notify all Discord tabs
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      const notifications = tabs.map(tab => 
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'toggleAsymmetricMode',
+          enabled: true
+        }).catch(() => {})
+      );
+      
+      await Promise.all(notifications);
+      
+      await this.updateAsymmetricStatus();
+      this.startAsymmetricStatusUpdates();
+      
+      console.log('Asymmetric encryption enabled');
+      
+    } catch (error) {
+      console.error('Failed to enable asymmetric mode:', error);
+    }
+  }
+
+  async disableAsymmetricMode() {
+    try {
+      await chrome.storage.local.set({ ecEnabled: false });
+      
+      // Notify all Discord tabs
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      const notifications = tabs.map(tab => 
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'toggleAsymmetricMode',
+          enabled: false
+        }).catch(() => {})
+      );
+      
+      await Promise.all(notifications);
+      
+      this.stopAsymmetricStatusUpdates();
+      
+      // Update status display
+      document.getElementById('ec-status-text').textContent = 'Disabled';
+      
+      console.log('Asymmetric encryption disabled');
+      
+    } catch (error) {
+      console.error('Failed to disable asymmetric mode:', error);
+    }
+  }
+
+  async updateAsymmetricRotationInterval() {
+    try {
+      const intervalMs = parseInt(this.ecRotationIntervalSelect.value);
+      await chrome.storage.local.set({ ecRotationInterval: intervalMs });
+      
+      // Update the EC crypto instance if available
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      const notifications = tabs.map(tab => 
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'updateECRotationInterval',
+          intervalMs: intervalMs
+        }).catch(() => {})
+      );
+      
+      await Promise.all(notifications);
+      
+      console.log(`EC rotation interval updated to ${intervalMs}ms`);
+      
+    } catch (error) {
+      console.error('Failed to update EC rotation interval:', error);
+    }
+  }
+
+  async rotateKeysManually() {
+    try {
+      this.rotateKeysButton.textContent = 'Rotating...';
+      this.rotateKeysButton.disabled = true;
+
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, { action: 'rotateKeys' });
+          console.log(`Rotated keys for tab ${tab.id}`);
+          break; // Only need one successful rotation
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+      await this.updateAsymmetricStatus();
+      
+    } catch (error) {
+      console.error('Failed to rotate keys:', error);
+    } finally {
+      this.rotateKeysButton.textContent = '🔄 Rotate Keys Now';
+      this.rotateKeysButton.disabled = false;
+    }
+  }
+
+  async updateAsymmetricStatus() {
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getAsymmetricStatus' });
+          
+          if (response && response.enabled) {
+            document.getElementById('ec-status-text').textContent = 'Active';
+            document.getElementById('current-key-id').textContent = response.currentPublicKeyId || '-';
+            document.getElementById('contact-count').textContent = response.contactCount || 0;
+            
+            if (response.rotationStatus && response.rotationStatus.timeUntilNext) {
+              const timeUntil = Math.ceil(response.rotationStatus.timeUntilNext / 1000);
+              document.getElementById('next-rotation').textContent = this.formatTime(response.rotationStatus.timeUntilNext);
+            } else {
+              document.getElementById('next-rotation').textContent = '-';
+            }
+            
+            break; // Got status from one tab, that's enough
+          }
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to update asymmetric status:', error);
+      document.getElementById('ec-status-text').textContent = 'Error';
+    }
+  }
+
+  startAsymmetricStatusUpdates() {
+    if (this.asymmetricStatusInterval) {
+      clearInterval(this.asymmetricStatusInterval);
+    }
+    
+    this.asymmetricStatusInterval = setInterval(() => {
+      this.updateAsymmetricStatus();
+    }, 5000); // Update every 5 seconds
+  }
+
+  stopAsymmetricStatusUpdates() {
+    if (this.asymmetricStatusInterval) {
+      clearInterval(this.asymmetricStatusInterval);
+      this.asymmetricStatusInterval = null;
+    }
+  }
+
+  toggleContactList() {
+    const isVisible = this.contactList.style.display !== 'none';
+    
+    if (isVisible) {
+      this.contactList.style.display = 'none';
+      this.viewContactsButton.textContent = '👥 View Contacts';
+    } else {
+      this.loadAndDisplayContacts();
+      this.contactList.style.display = 'block';
+      this.viewContactsButton.textContent = '👥 Hide Contacts';
+    }
+  }
+
+  async loadAndDisplayContacts() {
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getContactList' });
+          
+          if (response && Array.isArray(response)) {
+            this.displayContacts(response);
+            break;
+          }
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+      document.getElementById('contact-list-content').textContent = 'Error loading contacts';
+    }
+  }
+
+  displayContacts(contacts) {
+    const content = document.getElementById('contact-list-content');
+    
+    if (contacts.length === 0) {
+      content.textContent = 'No contacts discovered yet. Send or receive encrypted messages to discover contacts.';
+      return;
+    }
+    
+    let html = '';
+    contacts.forEach(contact => {
+      const discoveredDate = contact.discoveredAt ? new Date(contact.discoveredAt).toLocaleDateString() : 'Unknown';
+      
+      html += `<div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px; border-left: 3px solid #00a8ff;">`;
+      html += `<div style="font-weight: 600; color: #333;">👤 ${contact.username}</div>`;
+      
+      if (contact.discordUserId) {
+        html += `<div style="font-size: 11px; color: #666;">Discord ID: ${contact.discordUserId}</div>`;
+      }
+      
+      html += `<div style="font-size: 11px; color: #666;">Contact ID: ${contact.id}</div>`;
+      html += `<div style="font-size: 11px; color: #666;">Key ID: ${contact.keyId}</div>`;
+      html += `<div style="font-size: 10px; color: #999;">Discovered: ${discoveredDate}</div>`;
+      html += `<div style="font-size: 9px; color: #ccc; word-break: break-all; margin-top: 4px;">PubKey: ${contact.publicKey.substring(0, 32)}...</div>`;
+      html += `</div>`;
+    });
+    
+    content.innerHTML = html;
+  }
+
+  formatTime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
   }
 }
 

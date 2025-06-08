@@ -378,6 +378,60 @@
             </div>
         </div>
 
+        <!-- Asymmetric Encryption Section -->
+        <div class="key-info">
+            <div class="key-info-title">🔐 Asymmetric Encryption (EC)</div>
+            <div class="help-text" style="margin-bottom: 16px;">
+                Advanced elliptic curve encryption with automatic key exchange. No pre-shared keys needed - each user generates their own keypair and public keys are embedded in messages.
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="enable-asymmetric" style="margin-right: 8px;">
+                    <span>Enable asymmetric encryption (EC P-256)</span>
+                </label>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    Uses elliptic curve cryptography with automatic key rotation and contact discovery
+                </div>
+            </div>
+
+            <div id="asymmetric-settings" style="display: none;">
+                <div style="margin-bottom: 12px;">
+                    <label class="label" style="font-size: 14px;">Key Rotation Interval</label>
+                    <select id="ec-rotation-interval" class="input" style="font-size: 14px; padding: 10px;">
+                        <option value="900000">15 Minutes (High Security)</option>
+                        <option value="3600000" selected>1 Hour (Recommended)</option>
+                        <option value="21600000">6 Hours (Balanced)</option>
+                        <option value="86400000">1 Day (Low Security)</option>
+                    </select>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                        How often to rotate your private key for forward secrecy
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <button id="rotate-keys-now" class="button secondary" style="font-size: 14px; padding: 10px;">
+                        🔄 Rotate Keys Now
+                    </button>
+                    <button id="view-contacts" class="button secondary" style="font-size: 14px; padding: 10px; margin-left: 8px;">
+                        👥 View Contacts
+                    </button>
+                </div>
+
+                <div id="asymmetric-status" style="font-size: 12px; color: #666; background: #f8f9fa; padding: 12px; border-radius: 6px;">
+                    <div>Status: <span id="ec-status-text">Initializing...</span></div>
+                    <div>Current Key ID: <span id="current-key-id">-</span></div>
+                    <div>Contacts: <span id="contact-count">0</span></div>
+                    <div>Next Rotation: <span id="next-rotation">-</span></div>
+                </div>
+
+                <div id="contact-list" style="display: none; margin-top: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">📞 Discovered Contacts</div>
+                    <div id="contact-list-content" style="font-size: 11px; font-family: monospace; max-height: 100px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Decryption Speed Section -->
         <div class="key-info">
             <div class="key-info-title">⚡ Decryption Speed Settings</div>
@@ -425,8 +479,49 @@
             <div id="key-fingerprint" class="key-fingerprint"></div>
         </div>
 
+        <!-- Changelog Section -->
+        <div class="key-info">
+            <div class="key-info-title">📋 Version 2.0.0 - Asymmetric Encryption Release</div>
+            <div style="font-size: 13px; line-height: 1.5; color: #666;">
+                <div style="margin-bottom: 12px; padding: 12px; background: #e8f5e8; border-radius: 6px; border-left: 4px solid #28a745;">
+                    <div style="font-weight: 600; color: #155724; margin-bottom: 6px;">🚀 Major New Features</div>
+                    <div>• <strong>Asymmetric Encryption (EC P-256)</strong> - No pre-shared keys needed!</div>
+                    <div>• <strong>Discord User Tracking</strong> - Automatically extracts user IDs from avatar URLs</div>
+                    <div>• <strong>Contact Discovery</strong> - Public keys embedded in messages for automatic contact detection</div>
+                    <div>• <strong>Double Ratchet Key Rotation</strong> - Configurable intervals (15m-1d) for forward secrecy</div>
+                    <div>• <strong>Enhanced Contact Management</strong> - View discovered users with Discord usernames and IDs</div>
+                </div>
+                
+                <div style="margin-bottom: 12px; padding: 12px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                    <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">⚡ Improvements</div>
+                    <div>• <strong>Configurable Decryption Speed</strong> - Ultra fast (0.5s) to very slow (5s) scanning</div>
+                    <div>• <strong>Instant Post-Send Decryption</strong> - See your encrypted messages decrypt immediately</div>
+                    <div>• <strong>Simplified Sync System</strong> - Removed complex entropy calculations for better reliability</div>
+                    <div>• <strong>Enhanced UI</strong> - Better status displays and real-time updates</div>
+                </div>
+
+                <div style="margin-bottom: 12px; padding: 12px; background: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                    <div style="font-weight: 600; color: #0c5460; margin-bottom: 6px;">🔧 Technical Changes</div>
+                    <div>• Modular encryption system supporting both symmetric and asymmetric modes</div>
+                    <div>• Discord user identification via avatar URL parsing</div>
+                    <div>• Improved message processing with better Discord integration</div>
+                    <div>• Enhanced contact storage with user metadata</div>
+                    <div>• Removed webhook dependencies for cleaner operation</div>
+                </div>
+
+                <div style="font-size: 12px; color: #999; margin-top: 12px;">
+                    <strong>How to use Asymmetric Mode:</strong><br/>
+                    1. Enable "Asymmetric Encryption (EC P-256)" above<br/>
+                    2. Send messages normally - first contact uses static keys<br/>
+                    3. Public keys are automatically discovered from messages<br/>
+                    4. Future messages use discovered keys for enhanced security
+                </div>
+            </div>
+        </div>
+
         <div class="footer">
             <p>💡 Type <code>!priv</code> before your message in Discord to encrypt it</p>
+            <p style="font-size: 12px; color: #999; margin-top: 8px;">Discord Cryptochat v2.0.0 - Advanced Asymmetric Encryption</p>
         </div>
     </div>
 

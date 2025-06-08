@@ -9,9 +9,12 @@ class PopupManager {
     this.extensionIndicatorEl = document.getElementById('extension-indicator');
     this.keyStatusEl = document.getElementById('key-status');
     this.keyIndicatorEl = document.getElementById('key-indicator');
+    this.currentUserStatusEl = document.getElementById('current-user-status');
+    this.userIndicatorEl = document.getElementById('user-indicator');
     this.autoEncryptStatusEl = document.getElementById('auto-encrypt-status');
     this.autoEncryptToggleEl = document.getElementById('auto-encrypt-toggle');
     this.openOptionsBtn = document.getElementById('open-options');
+    this.setUserIdBtn = document.getElementById('set-user-id');
     this.testEncryptionBtn = document.getElementById('test-encryption');
     this.viewChangelogBtn = document.getElementById('view-changelog');
     
@@ -39,8 +42,8 @@ class PopupManager {
       this.extensionStatusEl.textContent = 'Active';
       this.extensionIndicatorEl.className = 'status-indicator active';
 
-      // Check encryption key and auto-encrypt status
-      const result = await chrome.storage.local.get(['encryptionKey', 'autoEncryptEnabled']);
+      // Check encryption key, current user, and auto-encrypt status
+      const result = await chrome.storage.local.get(['encryptionKey', 'autoEncryptEnabled', 'currentUserId', 'currentUsername']);
       
       if (result.encryptionKey) {
         this.keyStatusEl.textContent = 'Set';
@@ -48,6 +51,15 @@ class PopupManager {
       } else {
         this.keyStatusEl.textContent = 'Not Set';
         this.keyIndicatorEl.className = 'status-indicator inactive';
+      }
+
+      // Update current user status
+      if (result.currentUserId && result.currentUsername) {
+        this.currentUserStatusEl.textContent = result.currentUsername;
+        this.userIndicatorEl.className = 'status-indicator active';
+      } else {
+        this.currentUserStatusEl.textContent = 'Not Set';
+        this.userIndicatorEl.className = 'status-indicator inactive';
       }
 
       // Update auto-encrypt status
@@ -68,6 +80,10 @@ class PopupManager {
   setupEventListeners() {
     this.openOptionsBtn.addEventListener('click', () => {
       this.openOptions();
+    });
+
+    this.setUserIdBtn.addEventListener('click', async () => {
+      await this.setUserId();
     });
 
     this.testEncryptionBtn.addEventListener('click', async () => {
@@ -108,6 +124,58 @@ class PopupManager {
     } catch (error) {
       console.error('Failed to toggle auto-encrypt:', error);
       this.showNotification('Failed to update setting', 'error');
+    }
+  }
+
+  async setUserId() {
+    try {
+      // Simple prompt for user ID
+      const userId = prompt('Enter your Discord User ID:\n(You can find this in your avatar URL or Discord settings)');
+      
+      if (!userId || !userId.trim()) {
+        return; // User cancelled or entered empty string
+      }
+      
+      const trimmedUserId = userId.trim();
+      
+      // Validate that it looks like a Discord user ID (numeric, reasonable length)
+      if (!/^\d{17,19}$/.test(trimmedUserId)) {
+        this.showNotification('Invalid user ID format. Should be 17-19 digits.', 'error');
+        return;
+      }
+      
+      // Get username prompt
+      const username = prompt('Enter your Discord username (for display):') || 'User';
+      
+      // Save to storage
+      await chrome.storage.local.set({
+        currentUserId: trimmedUserId,
+        currentUsername: username.trim()
+      });
+      
+      // Update UI
+      this.currentUserStatusEl.textContent = username.trim();
+      this.userIndicatorEl.className = 'status-indicator active';
+      
+      // Notify content script to update current user
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.url && tab.url.includes('discord.com')) {
+          chrome.tabs.sendMessage(tab.id, { 
+            action: 'updateCurrentUser', 
+            userId: trimmedUserId,
+            username: username.trim()
+          });
+        }
+      } catch (error) {
+        console.log('Could not notify content script:', error);
+      }
+      
+      this.showNotification(`User set: ${username.trim()}`, 'success');
+      
+    } catch (error) {
+      console.error('Failed to set user ID:', error);
+      this.showNotification('Failed to set user ID', 'error');
     }
   }
 

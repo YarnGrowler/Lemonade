@@ -202,6 +202,14 @@
             </div>
 
             <div class="status-item">
+                <span class="status-label">Current User</span>
+                <div style="display: flex; align-items: center;">
+                    <span id="current-user-status" class="status-value">Not Set</span>
+                    <div id="user-indicator" class="status-indicator inactive"></div>
+                </div>
+            </div>
+
+            <div class="status-item">
                 <span class="status-label">Auto-Encrypt</span>
                 <div style="display: flex; align-items: center;">
                     <span id="auto-encrypt-status" class="status-value">Off</span>
@@ -215,6 +223,10 @@
 
         <button id="open-options" class="button">
             ⚙️ Open Settings
+        </button>
+
+        <button id="set-user-id" class="button">
+            👤 Set User ID
         </button>
 
         <button id="test-encryption" class="button">
