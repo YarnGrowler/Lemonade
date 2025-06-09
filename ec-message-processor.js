@@ -120,6 +120,25 @@ class ECMessageProcessor {
     console.log('🔐 [MSG] 🆔 Key ID:', keyId);
     console.log('🔐 [MSG] 👤 Username:', username);
     
+    // CRITICAL: Prevent storing our own key due to DOM confusion
+    const currentUser = this.ecCrypto.getCurrentUser();
+    if (currentUser.userId && senderUserId === currentUser.userId) {
+      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store key for current user (DOM confusion)');
+      console.log('🔐 [MSG] ⚠️ Current User ID:', currentUser.userId);
+      console.log('🔐 [MSG] ⚠️ Extracted User ID:', senderUserId);
+      console.log('🔐 [MSG] ⚠️ This prevents recipient key corruption!');
+      return;
+    }
+    
+    // ADDITIONAL: Prevent storing if key ID matches our own key
+    if (this.ecCrypto.myKeyId && keyId === this.ecCrypto.myKeyId) {
+      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store our own key ID');
+      console.log('🔐 [MSG] ⚠️ Our Key ID:', this.ecCrypto.myKeyId);
+      console.log('🔐 [MSG] ⚠️ Extracted Key ID:', keyId);
+      console.log('🔐 [MSG] ⚠️ This prevents self-key storage!');
+      return;
+    }
+    
     // If no user ID, try to find existing user with this key ID or create temp entry
     if (!senderUserId || senderUserId === 'null' || senderUserId === null) {
       console.log('🔐 [MSG] 🔍 No user ID provided, checking for existing keys...');
@@ -150,7 +169,7 @@ class ECMessageProcessor {
     
     // Check if this is a new key for this user
     const existingKey = this.ecCrypto.getUserKey(senderUserId);
-    const existingKeyId = existingKey ? this.ecCrypto.generateKeyId(existingKey) : null;
+    const existingKeyId = existingKey ? await this.ecCrypto.generateKeyId(existingKey) : null;
     
     if (!existingKey || existingKeyId !== keyId) {
       // New user or new key for existing user

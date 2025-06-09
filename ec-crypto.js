@@ -73,7 +73,7 @@ class ECCrypto {
         
         // Always regenerate key ID from current public key to ensure consistency
         const publicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
-        this.myKeyId = this.generateKeyId(publicKeyBase64);
+        this.myKeyId = await this.generateKeyId(publicKeyBase64);
         
         // Update stored key ID if it doesn't match
         if (stored.ecMyKeyId !== this.myKeyId) {
@@ -178,7 +178,7 @@ class ECCrypto {
     const exportedPublic = await this.exportPublicKey(this.staticPublicKey);
     
     // Generate and store my key ID
-    this.myKeyId = this.generateKeyId(exportedPublic);
+    this.myKeyId = await this.generateKeyId(exportedPublic);
     
     await chrome.storage.local.set({
       ecStaticPrivateKey: exportedPrivate,
@@ -212,7 +212,7 @@ class ECCrypto {
       // Generate my key ID if we have a static public key
       if (this.staticPublicKey) {
         const myPublicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
-        this.myKeyId = this.generateKeyId(myPublicKeyBase64);
+        this.myKeyId = await this.generateKeyId(myPublicKeyBase64);
       }
       
       console.log('🔐 [EC] 📂 Loaded current user info:', {
@@ -248,7 +248,18 @@ class ECCrypto {
   // ==================== USER KEY DISCOVERY & STORAGE ====================
 
   async addUserKey(userId, publicKeyBase64, username = 'Unknown') {
-    const keyId = this.generateKeyId(publicKeyBase64);
+    const keyId = await this.generateKeyId(publicKeyBase64);
+    
+    // 🚫 CRITICAL: NEVER STORE OUR OWN KEY ID (prevents corruption)
+    if (this.myKeyId && keyId === this.myKeyId) {
+      console.log('🔐 [EC] 🚫 BLOCKED: Attempted to store our own Key ID!');
+      console.log('🔐 [EC] 🚫 Our Key ID:', this.myKeyId);
+      console.log('🔐 [EC] 🚫 Blocked Key ID:', keyId);
+      console.log('🔐 [EC] 🚫 User ID:', userId);
+      console.log('🔐 [EC] 🚫 Username:', username);
+      console.log('🔐 [EC] 🚫 This prevents contact corruption!');
+      return false;
+    }
     
     // Prevent storing if this is our current user ID (primary check)
     if (this.currentUserId && userId === this.currentUserId) {
@@ -256,10 +267,15 @@ class ECCrypto {
       return false;
     }
     
-    // Secondary check: prevent storing our own public key if user ID unknown but key matches
-    if (!this.currentUserId && this.myKeyId && keyId === this.myKeyId) {
-      console.log('🔐 [EC] ⚠️ Ignoring own public key (no user ID set) - Key ID:', keyId);
-      return false;
+    // Additional check: prevent storing our own public key if key matches exactly
+    if (this.staticPublicKey) {
+      const myPublicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
+      if (publicKeyBase64 === myPublicKeyBase64) {
+        console.log('🔐 [EC] 🚫 BLOCKED: Attempted to store our own public key!');
+        console.log('🔐 [EC] 🚫 Our Public Key (partial):', myPublicKeyBase64.substring(0, 50) + '...');
+        console.log('🔐 [EC] 🚫 Blocked Public Key (partial):', publicKeyBase64.substring(0, 50) + '...');
+        return false;
+      }
     }
     
     // Check if we already have this user but with a different key (key rotation scenario)
@@ -270,15 +286,27 @@ class ECCrypto {
       const timeSinceLastRotation = Date.now() - (existingUser.rotatedAt || existingUser.discoveredAt || 0);
       
       if (timeSinceLastRotation < rotationCooldown) {
-        console.log('🔐 [EC] ⏰ Key rotation cooldown active - ignoring rotation attempt');
+        console.log('🔐 [EC] ⏰ Key rotation cooldown active - but ACCEPTING new key for forward secrecy!');
         console.log('🔐 [EC] ⏰ Old Key ID:', existingUser.keyId, '→ New Key ID:', keyId);
         console.log('🔐 [EC] ⏰ Time since last rotation:', Math.round(timeSinceLastRotation / 1000), 'seconds');
         console.log('🔐 [EC] ⏰ Cooldown remaining:', Math.round((rotationCooldown - timeSinceLastRotation) / 1000), 'seconds');
+        console.log('🔐 [EC] 🔄 UPDATING TO NEW KEY for double ratchet forward secrecy!');
         
-        // Just update last seen without triggering rotation
-        existingUser.lastSeen = Date.now();
-        this.userKeys.set(userId, existingUser);
+        // UPDATE TO NEW KEY - this is essential for forward secrecy!
+        const updatedUserInfo = {
+          publicKey: publicKeyBase64,
+          keyId: keyId,
+          username: username !== 'Unknown' ? username : existingUser.username,
+          lastSeen: Date.now(),
+          discoveredAt: existingUser.discoveredAt, // Keep original discovery time
+          rotatedAt: Date.now(), // Mark rotation time
+          previousKeyId: existingUser.keyId, // Store previous key for reference
+          fastRotation: true // Mark as fast rotation for debugging
+        };
+        
+        this.userKeys.set(userId, updatedUserInfo);
         await this.saveUserKeys();
+        console.log('🔐 [EC] ✅ Key updated during cooldown for forward secrecy!');
         return true;
       }
       
@@ -565,7 +593,7 @@ class ECCrypto {
       }
 
       const publicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
-      const keyId = this.generateKeyId(publicKeyBase64);
+      const keyId = await this.generateKeyId(publicKeyBase64);
       
       // Get stored key creation time
       const stored = await chrome.storage.local.get(['ecKeyCreated', 'ecRotationInterval']);
@@ -795,7 +823,7 @@ class ECCrypto {
       
       // Get my public key to attach
       const myPublicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
-      const myKeyId = this.generateKeyId(myPublicKeyBase64);
+      const myKeyId = await this.generateKeyId(myPublicKeyBase64);
       
       const result = {
         encrypted: btoa(String.fromCharCode(...combined)),
@@ -825,7 +853,7 @@ class ECCrypto {
     try {
       // Import sender's public key
       const senderPublicKey = await this.importPublicKey(senderPublicKeyBase64);
-      const senderKeyId = this.generateKeyId(senderPublicKeyBase64);
+      const senderKeyId = await this.generateKeyId(senderPublicKeyBase64);
       console.log('🔐 [EC] 🔑 Sender Key ID:', senderKeyId);
       
       let result = null;
@@ -838,22 +866,54 @@ class ECCrypto {
       if (isOwnMessage) {
         console.log('🔐 [EC] 🔄 Detected own message - trying stored recipient keys...');
         
-        // For our own messages, try to decrypt using each stored user's public key
-        // (because we encrypted FOR them using their public key + our private key)
-        for (const [userId, userInfo] of this.userKeys) {
+        // For our own messages, we need to decrypt using the SAME key derivation as encryption
+        // We encrypted using: our_private_key + recipient_public_key
+        // So we decrypt using: our_private_key + recipient_public_key (same as encryption)
+        
+        // Sort users by last seen time (most recent first) for better fallback
+        const sortedUsers = Array.from(this.userKeys.entries()).sort((a, b) => {
+          const timeA = a[1].lastSeen || 0;
+          const timeB = b[1].lastSeen || 0;
+          return timeB - timeA; // Most recent first
+        });
+        
+        for (const [userId, userInfo] of sortedUsers) {
           if (userId === this.currentUserId) continue; // Skip ourselves
+          if (userId.startsWith('temp_')) continue; // Skip temp contacts for own messages
           
           console.log('🔐 [EC] 🔍 Trying own message with stored user key:', userInfo.keyId, 'for user:', userId);
           try {
             const recipientPublicKey = await this.importPublicKey(userInfo.publicKey);
-            result = await this.tryDecryptWithKey(encryptedBase64, this.staticPrivateKey, recipientPublicKey);
+            // Use same key order as encryption: our_private + their_public
+            result = await this.tryDecryptWithKey(encryptedBase64, this.staticPrivateKey, recipientPublicKey, 'own_message');
             if (result) {
               decryptionMethod = 'own_message_recipient_key';
-              console.log('🔐 [EC] ✅ Decrypted own message with recipient key:', userInfo.keyId);
+              console.log('🔐 [EC] ✅ Decrypted own message with recipient key:', userInfo.keyId, 'for user:', userId);
               break;
             }
           } catch (error) {
             console.log('🔐 [EC] ❌ Own message decryption failed with key:', userInfo.keyId, error.message);
+          }
+        }
+        
+        // If still no result, try ALL stored keys including temp ones as last resort
+        if (!result) {
+          console.log('🔐 [EC] 🔍 Trying ALL stored keys as fallback (including temp)...');
+          for (const [userId, userInfo] of this.userKeys) {
+            if (userId === this.currentUserId) continue; // Skip ourselves
+            
+            console.log('🔐 [EC] 🔍 Fallback attempt with key:', userInfo.keyId, 'for user:', userId);
+            try {
+              const recipientPublicKey = await this.importPublicKey(userInfo.publicKey);
+              result = await this.tryDecryptWithKey(encryptedBase64, this.staticPrivateKey, recipientPublicKey, 'own_message_fallback');
+              if (result) {
+                decryptionMethod = 'own_message_fallback_key';
+                console.log('🔐 [EC] ✅ Decrypted own message with fallback key:', userInfo.keyId, 'for user:', userId);
+                break;
+              }
+            } catch (error) {
+              console.log('🔐 [EC] ❌ Fallback decryption failed with key:', userInfo.keyId);
+            }
           }
         }
         
@@ -873,10 +933,18 @@ class ECCrypto {
       } else {
         console.log('🔐 [EC] 📨 Processing message from other user...');
         
+        console.log('🔐 [EC] 🔑 RECIPIENT DECRYPTION DEBUG:');
+        console.log('🔐 [EC] 🔑   My Key ID:', this.myKeyId);
+        console.log('🔐 [EC] 🔑   My User ID:', this.currentUserId);
+        console.log('🔐 [EC] 🔑   Sender Key ID:', senderKeyId);
+        console.log('🔐 [EC] 🔑   Sender User ID:', senderUserId);
+        console.log('🔐 [EC] 🔑   Stored users:', Array.from(this.userKeys.keys()));
+        
         // Strategy 1: Try with sender's public key and our private key
         console.log('🔐 [EC] 🔍 Trying decryption with sender public key...');
+        console.log('🔐 [EC] 🔍   Using: Sender Public Key + My Private Key');
         try {
-          result = await this.tryDecryptWithKey(encryptedBase64, this.staticPrivateKey, senderPublicKey);
+          result = await this.tryDecryptWithKey(encryptedBase64, this.staticPrivateKey, senderPublicKey, 'other_message');
           if (result) {
             decryptionMethod = 'sender_public_key';
             console.log('🔐 [EC] ✅ Decrypted with sender public key!');
@@ -952,33 +1020,55 @@ class ECCrypto {
     }
   }
 
-  async tryDecryptWithKey(encryptedBase64, privateKey, senderPublicKey) {
+  async tryDecryptWithKey(encryptedBase64, privateKey, publicKey, messageType = 'other_message') {
+    console.log('🔐 [EC] 🔑 DETAILED DECRYPTION ATTEMPT:');
+    console.log('🔐 [EC] 🔑   Encrypted data length:', encryptedBase64.length);
+    console.log('🔐 [EC] 🔑   Private key type:', privateKey.constructor.name);
+    console.log('🔐 [EC] 🔑   Public key type:', publicKey.constructor.name);
+    console.log('🔐 [EC] 🔑   Message type:', messageType);
+    
     try {
       // Decode encrypted data
       const combined = new Uint8Array(
         atob(encryptedBase64).split('').map(char => char.charCodeAt(0))
       );
       
+      console.log('🔐 [EC] 🔑   Combined data length:', combined.length);
+      
       // Extract IV and encrypted data
       const iv = combined.slice(0, 12);
       const encryptedData = combined.slice(12);
       
+      console.log('🔐 [EC] 🔑   IV length:', iv.length);
+      console.log('🔐 [EC] 🔑   Encrypted payload length:', encryptedData.length);
+      
       // Derive shared secret and AES key
-      const sharedSecret = await this.deriveSharedSecret(privateKey, senderPublicKey);
+      console.log('🔐 [EC] 🔑   Deriving shared secret...');
+      const sharedSecret = await this.deriveSharedSecret(privateKey, publicKey);
+      console.log('🔐 [EC] 🔑   ✅ Shared secret derived');
+      
       const aesKey = await this.deriveAESKey(sharedSecret);
+      console.log('🔐 [EC] 🔑   ✅ AES key derived');
       
       // Decrypt
+      console.log('🔐 [EC] 🔑   Attempting AES decryption...');
       const decrypted = await crypto.subtle.decrypt(
         { name: this.aesAlgorithm, iv: iv },
         aesKey,
         encryptedData
       );
       
+      console.log('🔐 [EC] 🔑   ✅ AES decryption successful, result length:', decrypted.byteLength);
+      
       const decoder = new TextDecoder();
-      return decoder.decode(decrypted);
+      const result = decoder.decode(decrypted);
+      console.log('🔐 [EC] 🔑   ✅ Text decoding successful:', result);
+      
+      return result;
       
     } catch (error) {
-      console.log('🔐 [EC] 🔓 Decryption attempt failed:', error.message);
+      console.log('🔐 [EC] 🔓 Decryption attempt failed at step: ');
+      console.log('🔐 [EC] 🔓 Error details:', error.name);
       return null;
     }
   }
@@ -999,27 +1089,31 @@ class ECCrypto {
     return sharedSecret; // The derived key IS the AES key
   }
 
-  generateKeyId(publicKeyBase64) {
-    // Generate a unique hash-based ID from the full public key
-    // Include timestamp and randomness to ensure uniqueness
-    const timestamp = Date.now().toString();
-    const random = Math.random().toString();
-    const combined = publicKeyBase64 + timestamp + random;
+  async generateKeyId(publicKeyBase64) {
+    // Generate a TRULY DETERMINISTIC hash-based ID from the public key ONLY
+    // Use SHA-256 to ensure same key always produces same ID across all browsers/users
     
-    // Create a better hash
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      const char = combined.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+    const encoder = new TextEncoder();
+    const data = encoder.encode(publicKeyBase64);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    // Convert first 8 bytes to base64-like string
+    let keyId = '';
+    for (let i = 0; i < 8; i++) {
+      keyId += hashArray[i].toString(36).padStart(2, '0');
     }
     
-    // Convert to base64-like string and ensure it's 12 chars
-    const hashStr = Math.abs(hash).toString(36);
-    const keyStr = publicKeyBase64.substring(publicKeyBase64.length - 8);
-    const combined2 = hashStr + keyStr;
+    // Take first 12 characters and ensure they're valid
+    keyId = keyId.substring(0, 12).toUpperCase();
     
-    return btoa(combined2).replace(/[^A-Za-z0-9]/g, '').substring(0, 12).padEnd(12, 'X');
+    // Replace any invalid characters with deterministic alternatives
+    keyId = keyId.replace(/[^A-Z0-9]/g, 'X');
+    
+    // Ensure exactly 12 characters
+    keyId = keyId.padEnd(12, 'X');
+    
+    return keyId;
   }
 
   async exportPublicKey(publicKey) {
@@ -1066,7 +1160,7 @@ class ECCrypto {
     return {
       enabled: true,
       userCount: this.userKeys.size,
-      myKeyId: this.staticPublicKey ? this.generateKeyId('temp') : null
+      myKeyId: this.myKeyId || null
     };
   }
 
@@ -1084,6 +1178,40 @@ class ECCrypto {
     this.userKeys.clear();
     await this.saveUserKeys();
     console.log('🔐 [EC] 🗑️ Cleared all user keys');
+  }
+
+  // Helper method to clean up any corrupted contacts (same Key ID as ours)
+  async cleanupCorruptedContacts() {
+    if (!this.myKeyId) {
+      console.log('🔐 [EC] 🧹 No Key ID set, cannot clean corrupted contacts');
+      return 0;
+    }
+
+    let removedCount = 0;
+    const contactsToRemove = [];
+
+    for (const [userId, userInfo] of this.userKeys) {
+      if (userInfo.keyId === this.myKeyId) {
+        console.log(`🔐 [EC] 🧹 Found corrupted contact: ${userId} (${userInfo.username}) - Key ID: ${userInfo.keyId}`);
+        contactsToRemove.push(userId);
+        removedCount++;
+      }
+    }
+
+    // Remove corrupted contacts
+    for (const userId of contactsToRemove) {
+      this.userKeys.delete(userId);
+      console.log(`🔐 [EC] 🗑️ Removed corrupted contact: ${userId}`);
+    }
+
+    if (removedCount > 0) {
+      await this.saveUserKeys();
+      console.log(`🔐 [EC] ✅ Cleaned up ${removedCount} corrupted contacts`);
+    } else {
+      console.log('🔐 [EC] ✅ No corrupted contacts found');
+    }
+
+    return removedCount;
   }
 }
 

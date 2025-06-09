@@ -59,7 +59,24 @@ class OptionsManager {
     await this.loadKeyRotationSettings();
     await this.loadSpeedSettings();
     await this.loadAsymmetricSettings();
+    await this.updateCurrentUserDisplay(); // Load current user ID info
     this.setupEventListeners();
+    
+    // Always try to load key info if EC keys exist, regardless of enabled state
+    setTimeout(async () => {
+      const stored = await chrome.storage.local.get(['ecStaticPublicKey', 'ecMyKeyId']);
+      if (stored.ecStaticPublicKey || stored.ecMyKeyId) {
+        console.log('EC keys detected, loading key information...');
+        await this.updateCurrentKeyInfo();
+        await this.refreshContactsList();
+        
+        // If keys exist but asymmetric mode isn't enabled, suggest enabling it
+        const ecEnabled = await chrome.storage.local.get(['ecEnabled']);
+        if (!ecEnabled.ecEnabled) {
+          console.log('EC keys exist but asymmetric mode is disabled');
+        }
+      }
+    }, 500);
   }
 
   async loadStoredKey() {
@@ -185,6 +202,19 @@ class OptionsManager {
 
     document.getElementById('cleanup-temp-contacts')?.addEventListener('click', async () => {
       await this.cleanupTempContacts();
+    });
+
+    document.getElementById('reset-timer')?.addEventListener('click', async () => {
+      await this.resetRotationTimer();
+    });
+
+    // User ID Management
+    document.getElementById('set-user-id')?.addEventListener('click', async () => {
+      await this.setUserIdManually();
+    });
+
+    document.getElementById('auto-detect-user-id')?.addEventListener('click', async () => {
+      await this.autoDetectUserId();
     });
   }
 
@@ -953,12 +983,23 @@ class OptionsManager {
       const result = await chrome.storage.local.get(['ecEnabled', 'ecRotationInterval']);
       
       this.enableAsymmetricCheckbox.checked = result.ecEnabled || false;
-      this.ecRotationIntervalSelect.value = (result.ecRotationInterval || 3600000).toString();
+      
+      // Handle the interval selection including 'manual' option
+      const rotationInterval = result.ecRotationInterval;
+      if (rotationInterval === null || rotationInterval === undefined) {
+        this.ecRotationIntervalSelect.value = 'manual';
+      } else {
+        this.ecRotationIntervalSelect.value = rotationInterval.toString();
+      }
       
       this.toggleAsymmetricSettings();
       
       if (result.ecEnabled) {
-        await this.updateAsymmetricStatus();
+        // Initial load of key info
+        await this.updateCurrentKeyInfo();
+        await this.refreshContactsList();
+        
+        // Start periodic updates
         this.startAsymmetricStatusUpdates();
       }
       
@@ -973,10 +1014,14 @@ class OptionsManager {
     
     if (isEnabled) {
       this.enableAsymmetricMode();
-      // Load current key info and contacts
-      setTimeout(() => {
-        this.updateCurrentKeyInfo();
-        this.refreshContactsList();
+      // Load current key info and contacts immediately, then again after delay
+      this.updateCurrentKeyInfo();
+      this.refreshContactsList();
+      
+      // Also check again after a brief delay to ensure everything is loaded
+      setTimeout(async () => {
+        await this.updateCurrentKeyInfo();
+        await this.refreshContactsList();
       }, 1000);
     } else {
       this.disableAsymmetricMode();
@@ -985,7 +1030,20 @@ class OptionsManager {
 
   async enableAsymmetricMode() {
     try {
-      await chrome.storage.local.set({ ecEnabled: true });
+      const currentTime = Date.now();
+      
+      // Get current rotation interval to set proper timing
+      const stored = await chrome.storage.local.get(['ecRotationInterval']);
+      
+      await chrome.storage.local.set({ 
+        ecEnabled: true,
+        ecLastRotation: currentTime // Reset rotation timer when enabling
+      });
+      
+      // If there's a rotation interval set, make sure the timer is properly initialized
+      if (stored.ecRotationInterval && stored.ecRotationInterval !== null) {
+        console.log(`Resetting rotation timer with ${stored.ecRotationInterval}ms interval`);
+      }
       
       // Notify all Discord tabs
       const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
@@ -998,7 +1056,6 @@ class OptionsManager {
       
       await Promise.all(notifications);
       
-      await this.updateAsymmetricStatus();
       this.startAsymmetricStatusUpdates();
       
       console.log('Asymmetric encryption enabled');
@@ -1063,22 +1120,38 @@ class OptionsManager {
       this.rotateKeysButton.textContent = 'Rotating...';
       this.rotateKeysButton.disabled = true;
 
+      // Try to send rotation command to Discord tabs
       const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      let rotationSuccess = false;
       
       for (const tab of tabs) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'rotateKeys' });
-          console.log(`Rotated keys for tab ${tab.id}`);
-          break; // Only need one successful rotation
+          console.log(`Sent rotation command to tab ${tab.id}`);
+          rotationSuccess = true;
+          break; // Only need one successful command
         } catch (error) {
+          console.log(`Failed to send rotation command to tab ${tab.id}:`, error);
           // Try next tab
         }
       }
       
-      await this.updateAsymmetricStatus();
+      if (!rotationSuccess) {
+        // If no Discord tabs available, show message
+        this.showStatus('Please open Discord in a tab to rotate keys', 'error');
+        return;
+      }
+      
+      // Wait a moment for rotation to complete, then update display
+      setTimeout(async () => {
+        await this.updateCurrentKeyInfo();
+        await this.refreshContactsList();
+        this.showStatus('Key rotation initiated successfully!', 'success');
+      }, 1000);
       
     } catch (error) {
       console.error('Failed to rotate keys:', error);
+      this.showStatus('Failed to rotate keys: ' + error.message, 'error');
     } finally {
       this.rotateKeysButton.textContent = '🔄 Rotate Keys Now';
       this.rotateKeysButton.disabled = false;
@@ -1201,11 +1274,15 @@ class OptionsManager {
   }
 
   formatTime(ms) {
+    if (ms <= 0) return '0s';
+    
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
     
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
   }
@@ -1217,21 +1294,25 @@ class OptionsManager {
       this.viewContactsButton.textContent = '🔄 Loading...';
       this.viewContactsButton.disabled = true;
 
-      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      // Get contacts directly from storage
+      const stored = await chrome.storage.local.get(['ecUserKeys']);
+      const userKeys = stored.ecUserKeys || {};
       
-      for (const tab of tabs) {
-        try {
-          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getContactList' });
-          
-          if (response && Array.isArray(response)) {
-            this.displayContactsInNewFormat(response);
-            document.getElementById('contact-count').textContent = response.length;
-            break;
-          }
-        } catch (error) {
-          // Try next tab
-        }
+      // Convert storage format to display format
+      const contacts = [];
+      for (const [userId, userInfo] of Object.entries(userKeys)) {
+        contacts.push({
+          id: userId,
+          discordUserId: userId.startsWith('temp_') ? null : userId,
+          username: userInfo.username || 'Unknown User',
+          keyId: userInfo.keyId,
+          publicKey: userInfo.publicKey,
+          discoveredAt: userInfo.discoveredAt || userInfo.addedAt || Date.now()
+        });
       }
+      
+      this.displayContactsInNewFormat(contacts);
+      document.getElementById('contact-count').textContent = contacts.length;
       
       // Also update the key info
       await this.updateCurrentKeyInfo();
@@ -1277,49 +1358,93 @@ class OptionsManager {
 
   async updateCurrentKeyInfo() {
     try {
-      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      // Get key information directly from storage
+      const stored = await chrome.storage.local.get([
+        'ecStaticPublicKey',
+        'ecMyKeyId', 
+        'ecKeyGenerated',
+        'ecRotationInterval',
+        'ecLastRotation',
+        'ecUserKeys'
+      ]);
+
+      // Update key ID
+      const keyId = stored.ecMyKeyId || 'Not generated';
+      document.getElementById('current-key-id').textContent = keyId;
       
-      for (const tab of tabs) {
-        try {
-          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getCurrentKeyInfo' });
-          
-          if (response && response.success) {
-            const keyInfo = response.keyInfo;
-            
-            // Update key ID
-            document.getElementById('current-key-id').textContent = keyInfo.keyId || 'Loading...';
-            
-            // Update public key
-            document.getElementById('my-public-key').value = keyInfo.publicKey || 'Loading...';
-            
-            // Update key created time
-            if (keyInfo.created) {
-              document.getElementById('key-created').textContent = new Date(keyInfo.created).toLocaleString();
-            } else {
-              document.getElementById('key-created').textContent = 'Unknown';
-            }
-            
-            // Update next rotation
-            if (keyInfo.nextRotation) {
-              const timeUntil = keyInfo.nextRotation - Date.now();
-              if (timeUntil > 0) {
-                document.getElementById('next-rotation').textContent = this.formatTime(timeUntil);
-              } else {
-                document.getElementById('next-rotation').textContent = 'Due for rotation';
-              }
-            } else {
-              document.getElementById('next-rotation').textContent = 'Manual only';
-            }
-            
-            break;
-          }
-        } catch (error) {
-          // Try next tab
+      // Update public key
+      const publicKey = stored.ecStaticPublicKey || 'Not available';
+      document.getElementById('my-public-key').value = publicKey;
+      
+      // Update key created time
+      if (stored.ecKeyGenerated) {
+        document.getElementById('key-created').textContent = new Date(stored.ecKeyGenerated).toLocaleString();
+      } else {
+        document.getElementById('key-created').textContent = 'Unknown';
+      }
+      
+      // Update contact count
+      const userKeys = stored.ecUserKeys || {};
+      const contactCount = Object.keys(userKeys).length;
+      document.getElementById('contact-count').textContent = contactCount;
+      
+      // Update next rotation
+      await this.updateNextRotationTime(stored);
+      
+    } catch (error) {
+      console.error('Failed to update current key info:', error);
+      document.getElementById('current-key-id').textContent = 'Error loading';
+      document.getElementById('my-public-key').value = 'Error loading key info';
+      document.getElementById('key-created').textContent = 'Error';
+      document.getElementById('contact-count').textContent = '0';
+    }
+  }
+
+  async updateNextRotationTime(stored) {
+    try {
+      const rotationInterval = stored.ecRotationInterval;
+      
+      if (!rotationInterval || rotationInterval === null || rotationInterval === 'manual') {
+        document.getElementById('next-rotation').textContent = 'Manual only';
+        return;
+      }
+      
+      const intervalMs = parseInt(rotationInterval);
+      if (isNaN(intervalMs) || intervalMs <= 0) {
+        document.getElementById('next-rotation').textContent = 'Invalid interval';
+        return;
+      }
+      
+      // TIMESTAMP-BASED ROTATION TIMER (survives page reloads)
+      // Priority: ecLastRotation > ecKeyGenerated > now
+      let baseTimestamp = stored.ecLastRotation || stored.ecKeyGenerated || Date.now();
+      
+      // If we don't have a last rotation time, set it now for future calculations
+      if (!stored.ecLastRotation) {
+        console.log('⏰ Setting initial rotation baseline timestamp');
+        await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
+      }
+      
+      const now = Date.now();
+      const nextRotationTime = baseTimestamp + intervalMs;
+      const timeUntil = nextRotationTime - now;
+      
+      if (timeUntil > 0) {
+        // Show countdown to next rotation
+        document.getElementById('next-rotation').textContent = this.formatTime(timeUntil);
+      } else {
+        // Rotation is overdue
+        const overdueBy = Math.abs(timeUntil);
+        document.getElementById('next-rotation').textContent = 'Due for rotation';
+        
+        if (overdueBy > 60000) { // More than 1 minute overdue
+          console.log(`⏰ Key rotation overdue by ${this.formatTime(overdueBy)}`);
         }
       }
       
     } catch (error) {
-      console.error('Failed to update current key info:', error);
+      console.error('Failed to update next rotation time:', error);
+      document.getElementById('next-rotation').textContent = 'Error';
     }
   }
 
@@ -1356,24 +1481,28 @@ class OptionsManager {
     if (!confirmed) return;
     
     try {
-      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      // Clear contacts directly in storage
+      await chrome.storage.local.set({ ecUserKeys: {} });
       
+      // Also try to notify Discord tabs to clear their in-memory cache
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
       for (const tab of tabs) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'clearAllContacts' });
-          break; // Only need one successful clear
         } catch (error) {
-          // Try next tab
+          // Ignore tab communication errors, storage clear is what matters
         }
       }
       
-      // Refresh the display
+      // Refresh the display immediately
       await this.refreshContactsList();
+      await this.updateCurrentKeyInfo(); // This will update the contact count too
+      
       this.showStatus('All contacts cleared successfully', 'success');
       
     } catch (error) {
       console.error('Failed to clear contacts:', error);
-      this.showStatus('Failed to clear contacts', 'error');
+      this.showStatus('Failed to clear contacts: ' + error.message, 'error');
     }
   }
 
@@ -1465,10 +1594,14 @@ class OptionsManager {
       } else {
         // Enable automatic rotation with specified interval
         const intervalMs = parseInt(interval);
+        const currentTime = Date.now();
+        
         await chrome.storage.local.set({
           ecRotationInterval: intervalMs,
-          ecAutoRotation: true
+          ecAutoRotation: true,
+          ecLastRotation: currentTime // Reset the rotation timer to now
         });
+        
         this.showStatus(`Key rotation set to ${this.formatInterval(intervalMs)}`, 'success');
         
         // Update the EC crypto instance if available
@@ -1484,8 +1617,8 @@ class OptionsManager {
       }
       
       // Trigger refresh of status to show new next rotation time
-      setTimeout(() => {
-        this.updateCurrentKeyInfo();
+      setTimeout(async () => {
+        await this.updateCurrentKeyInfo();
       }, 100);
       
     } catch (error) {
@@ -1500,9 +1633,10 @@ class OptionsManager {
       clearInterval(this.asymmetricStatusInterval);
     }
     
-    this.asymmetricStatusInterval = setInterval(() => {
-      this.updateCurrentKeyInfo();
-    }, 5000); // Update every 5 seconds
+    // Update every second for real-time countdown
+    this.asymmetricStatusInterval = setInterval(async () => {
+      await this.updateCurrentKeyInfo();
+    }, 1000); // Update every second for live countdown
   }
 
   // Debug Methods
@@ -1738,6 +1872,151 @@ class OptionsManager {
     } catch (error) {
       debugLog.value += `❌ Cleanup temp contacts failed: ${error.message}\n`;
       console.error('Cleanup temp contacts error:', error);
+    }
+  }
+
+  async resetRotationTimer() {
+    try {
+      const currentTime = Date.now();
+      
+      // Get current settings
+      const stored = await chrome.storage.local.get(['ecRotationInterval']);
+      
+      if (!stored.ecRotationInterval || stored.ecRotationInterval === null) {
+        this.showStatus('No rotation interval set - timer is in manual mode', 'info');
+        return;
+      }
+      
+      // Reset the timer to start from now
+      await chrome.storage.local.set({
+        ecLastRotation: currentTime,
+        ecKeyGenerated: currentTime // Also ensure key generation time is set
+      });
+      
+      // Update display immediately
+      await this.updateCurrentKeyInfo();
+      
+      this.showStatus(`Timer reset! Next rotation in ${this.formatInterval(stored.ecRotationInterval)}`, 'success');
+      
+    } catch (error) {
+      console.error('Failed to reset rotation timer:', error);
+      this.showStatus('Failed to reset timer: ' + error.message, 'error');
+    }
+  }
+
+  // ========== USER ID MANAGEMENT ==========
+
+  async setUserIdManually() {
+    const userIdInput = document.getElementById('manual-user-id');
+    const usernameInput = document.getElementById('manual-username');
+    
+    const userId = userIdInput.value.trim();
+    const username = usernameInput.value.trim() || 'Unknown';
+    
+    if (!userId) {
+      this.showStatus('Please enter your Discord User ID', 'error');
+      return;
+    }
+    
+    // Validate user ID format (Discord user IDs are 17-19 digits)
+    if (!/^\d{17,19}$/.test(userId)) {
+      this.showStatus('Invalid Discord User ID format. Should be 17-19 digits.', 'error');
+      return;
+    }
+    
+    try {
+      // Store the user ID and username
+      await chrome.storage.local.set({
+        currentUserId: userId,
+        currentUsername: username
+      });
+      
+      // Notify Discord tabs to update their user info
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      for (const tab of tabs) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'setCurrentUser',
+            userId: userId,
+            username: username
+          });
+        } catch (error) {
+          // Ignore tab communication errors
+        }
+      }
+      
+      // Update the display
+      await this.updateCurrentUserDisplay();
+      
+      // Clear the input fields
+      userIdInput.value = '';
+      usernameInput.value = '';
+      
+      this.showStatus('✅ User ID set successfully! This should fix message decryption issues.', 'success');
+      
+    } catch (error) {
+      console.error('Failed to set user ID:', error);
+      this.showStatus('Failed to set user ID: ' + error.message, 'error');
+    }
+  }
+
+  async autoDetectUserId() {
+    try {
+      this.showStatus('🔍 Trying to auto-detect your Discord User ID...', 'info');
+      
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      if (tabs.length === 0) {
+        this.showStatus('No Discord tab found. Please open Discord first.', 'error');
+        return;
+      }
+      
+      // Try to get user ID from Discord tab
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, {
+            action: 'detectCurrentUser'
+          });
+          
+          if (response && response.userId) {
+            // Auto-fill the inputs
+            document.getElementById('manual-user-id').value = response.userId;
+            if (response.username && response.username !== 'Unknown') {
+              document.getElementById('manual-username').value = response.username;
+            }
+            
+            this.showStatus('✅ Auto-detected User ID: ' + response.userId + '. Click "Set User ID" to save.', 'success');
+            return;
+          }
+        } catch (error) {
+          console.log('Failed to detect user ID from tab:', tab.id);
+        }
+      }
+      
+      this.showStatus('❌ Could not auto-detect User ID. Please set it manually.', 'error');
+      
+    } catch (error) {
+      console.error('Failed to auto-detect user ID:', error);
+      this.showStatus('Failed to auto-detect user ID: ' + error.message, 'error');
+    }
+  }
+
+  async updateCurrentUserDisplay() {
+    try {
+      const stored = await chrome.storage.local.get(['currentUserId', 'currentUsername']);
+      
+      const userIdDisplay = document.getElementById('current-user-id');
+      const usernameDisplay = document.getElementById('current-username');
+      
+      if (userIdDisplay) {
+        userIdDisplay.textContent = stored.currentUserId || 'Not set';
+      }
+      
+      if (usernameDisplay) {
+        usernameDisplay.textContent = stored.currentUsername || 'Not set';
+      }
+      
+    } catch (error) {
+      console.error('Failed to update user display:', error);
     }
   }
 }

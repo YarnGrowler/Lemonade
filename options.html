@@ -413,6 +413,47 @@
                     </div>
                 </div>
 
+                <!-- User ID Setting Section -->
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px; color: #856404;">👤 Discord User ID Setting</div>
+                    <div style="font-size: 12px; line-height: 1.4; color: #856404; margin-bottom: 12px;">
+                        <strong>Fix message decryption issues:</strong> Sometimes the system gets confused about your Discord user ID, causing encryption failures. Set your ID manually to prevent this.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 12px; margin-bottom: 12px; align-items: center;">
+                        <div style="font-weight: 500; color: #856404;">Current User ID:</div>
+                        <div id="current-user-id" style="font-family: monospace; background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">Not set</div>
+                        
+                        <div style="font-weight: 500; color: #856404;">Username:</div>
+                        <div id="current-username" style="background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">Not set</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label class="label" style="font-size: 14px; margin-bottom: 8px; color: #856404;">Set Your Discord User ID</label>
+                        <input type="text" id="manual-user-id" class="input" placeholder="e.g. 1127964562625417346" style="font-size: 14px; padding: 10px; font-family: monospace;">
+                        <div style="font-size: 11px; color: #856404; margin-top: 4px;">
+                            📋 <strong>How to find your ID:</strong> Go to Discord Settings → Advanced → Enable "Developer Mode" → Right-click your profile → "Copy User ID"
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label class="label" style="font-size: 14px; margin-bottom: 8px; color: #856404;">Set Your Username (Optional)</label>
+                        <input type="text" id="manual-username" class="input" placeholder="e.g. YourDiscordName" style="font-size: 14px; padding: 10px;">
+                        <div style="font-size: 11px; color: #856404; margin-top: 4px;">
+                            This is just for display purposes in your contacts list
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px;">
+                        <button id="set-user-id" class="button" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #856404; color: white;">
+                            💾 Set User ID
+                        </button>
+                        <button id="auto-detect-user-id" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #17a2b8; color: white;">
+                            🔍 Auto-Detect
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Key Management Section -->
                 <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                     <div style="font-weight: 600; margin-bottom: 12px; color: #333;">🔑 Current Key Information</div>
@@ -516,12 +557,18 @@
                 </button>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
                 <button id="fix-after-rotation" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
                     🔄 Fix Rotation
                 </button>
                 <button id="cleanup-temp-contacts" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
                     🧹 Clean Temps
+                </button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px;">
+                <button id="reset-timer" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,193,7,0.8); border: 1px solid rgba(255,193,7,0.5); color: #333;">
+                    ⏰ Reset Rotation Timer
                 </button>
             </div>
             

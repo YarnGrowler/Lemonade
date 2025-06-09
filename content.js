@@ -262,6 +262,10 @@ class DiscordCryptochat {
         // Manually rotate keys
         this.handleRotateKeys(sendResponse);
         return true; // Keep channel open for async response
+      } else if (request.action === 'rotateECKeys') {
+        // Background timer triggered EC key rotation
+        this.handleRotateECKeys(request.source, sendResponse);
+        return true; // Keep channel open for async response
       } else if (request.action === 'debugKeyStatus') {
         // Debug key status
         try {
@@ -1570,6 +1574,28 @@ class DiscordCryptochat {
       sendResponse({ success: false, error: error.message });
     }
   }
+
+  async handleRotateECKeys(source, sendResponse) {
+    try {
+      console.log(`🔐 [CONTENT] 🔑 EC key rotation triggered by: ${source}`);
+      
+      if (!window.ecCrypto) {
+        console.log('🔐 [CONTENT] 🔑 EC crypto not available');
+        sendResponse({ success: false, error: 'EC crypto not available' });
+        return;
+      }
+
+      // Perform the rotation
+      await window.ecCrypto.rotateKeysNow();
+      
+      console.log('🔐 [CONTENT] 🔑 ✅ EC key rotation completed successfully');
+      sendResponse({ success: true, source: source });
+      
+    } catch (error) {
+      console.error('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
+      sendResponse({ success: false, error: error.message, source: source });
+    }
+  }
 }
 
 // Initialize when the script loads
@@ -1734,4 +1760,30 @@ window.fixAfterRotation = async function() {
   }
   
   console.log('🔐 [FIX] ==============================');
+};
+
+// Clean up corrupted contacts (contacts with same Key ID as ours)
+window.cleanupCorruptedContacts = async function() {
+  console.log('🔐 [CLEANUP] === CLEANING CORRUPTED CONTACTS ===');
+  
+  if (!window.ecCrypto) {
+    console.log('🔐 [CLEANUP] ECCrypto not available');
+    return;
+  }
+  
+  try {
+    const removedCount = await window.ecCrypto.cleanupCorruptedContacts();
+    console.log(`🔐 [CLEANUP] ✅ Cleaned up ${removedCount} corrupted contacts`);
+    
+    if (removedCount > 0) {
+      console.log('🔐 [CLEANUP] 💡 Corruption should be resolved now');
+    } else {
+      console.log('🔐 [CLEANUP] 💡 No corrupted contacts found');
+    }
+    
+  } catch (error) {
+    console.error('🔐 [CLEANUP] Error during cleanup:', error);
+  }
+  
+  console.log('🔐 [CLEANUP] ================================');
 }; 

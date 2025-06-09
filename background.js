@@ -119,19 +119,19 @@ class BackgroundKeyRotation {
         console.log(`🔐 [BACKGROUND] Old key: ${storedKey?.substring(0, 8)}...`);
         console.log(`🔐 [BACKGROUND] New key: ${currentKey?.substring(0, 8)}...`);
         
-                 await this.storeKey(currentKey);
-         this.currentStoredKey = currentKey;
-         
-         // Update rotation tracking
-         await this.updateRotationData();
-         
-         // Security: Delete base key after first rotation
-         await this.deleteBaseKeyAfterFirstRotation(settings);
-         
-         // Notify all Discord content scripts about key update
-         await this.notifyContentScriptsKeyUpdate(currentKey);
+        await this.storeKey(currentKey);
+        this.currentStoredKey = currentKey;
         
-        console.log('🔐 [BACKGROUND] ✅ Key rotation completed and content scripts notified');
+        // Update rotation tracking
+        await this.updateRotationData();
+        
+        // Security: Delete base key after first rotation
+        await this.deleteBaseKeyAfterFirstRotation(settings);
+        
+        // Notify all Discord content scripts about key update
+        await this.notifyContentScriptsKeyUpdate(currentKey);
+       
+       console.log('🔐 [BACKGROUND] ✅ Key rotation completed and content scripts notified');
       }
       
     } catch (error) {
@@ -311,5 +311,138 @@ class BackgroundKeyRotation {
   }
 }
 
+// ==================== EC (ASYMMETRIC) KEY ROTATION MONITORING ====================
+
+class BackgroundECRotation {
+  constructor() {
+    this.lastECRotationCheck = 0;
+    this.ecRotationCheckInterval = 5000; // 5 seconds (more frequent for testing)
+    this.init();
+  }
+
+  async init() {
+    console.log('🔐 [BACKGROUND] 🔑 Initializing EC key rotation monitoring...');
+    
+    // Start monitoring immediately
+    this.startECRotationMonitoring();
+  }
+
+  startECRotationMonitoring() {
+    // Check immediately on startup
+    setTimeout(() => this.checkAndRotateECKey(), 2000);
+    
+    // Then check every 5 seconds
+    setInterval(() => this.checkAndRotateECKey(), this.ecRotationCheckInterval);
+    
+    console.log('🔐 [BACKGROUND] 🔑 EC key rotation monitoring started');
+  }
+
+  async checkAndRotateECKey() {
+    try {
+      const now = Date.now();
+      
+      // Don't check too frequently
+      if (now - this.lastECRotationCheck < this.ecRotationCheckInterval) {
+        return;
+      }
+      
+      this.lastECRotationCheck = now;
+      
+      const settings = await this.getECRotationSettings();
+      if (!settings.enabled || !settings.intervalMs) {
+        return; // EC rotation not configured or disabled
+      }
+      
+             // TIMESTAMP-BASED rotation check (survives restarts)
+       // Priority: lastRotation > keyGenerated > now
+       let baseTimestamp = settings.lastRotation || settings.keyGenerated;
+       
+       if (!baseTimestamp) {
+         // No timestamp available, set initial baseline
+         baseTimestamp = now;
+         await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
+         console.log(`🔐 [BACKGROUND] 🔑 Set initial rotation baseline: ${new Date(baseTimestamp).toLocaleString()}`);
+       }
+       
+       const nextRotationTime = baseTimestamp + settings.intervalMs;
+      
+      if (now >= nextRotationTime) {
+        console.log('🔐 [BACKGROUND] 🔑 EC key rotation due - triggering rotation');
+        console.log(`🔐 [BACKGROUND] 🔑 Last rotation: ${new Date(lastRotation).toLocaleString()}`);
+        console.log(`🔐 [BACKGROUND] 🔑 Next rotation was: ${new Date(nextRotationTime).toLocaleString()}`);
+        console.log(`🔐 [BACKGROUND] 🔑 Overdue by: ${Math.round((now - nextRotationTime) / 1000)} seconds`);
+        
+        // Trigger rotation by notifying Discord tabs
+        await this.triggerECKeyRotation();
+        
+        // Update last rotation time to prevent immediate re-rotation
+        await chrome.storage.local.set({
+          ecLastRotation: now
+        });
+        
+        console.log('🔐 [BACKGROUND] 🔑 ✅ EC key rotation triggered and timestamp updated');
+      } else {
+        const timeUntilNext = Math.ceil((nextRotationTime - now) / 1000);
+        if (timeUntilNext % 30 === 0) { // Log every 30 seconds
+          console.log(`🔐 [BACKGROUND] 🔑 EC rotation in ${timeUntilNext}s`);
+        }
+      }
+      
+    } catch (error) {
+      console.error('🔐 [BACKGROUND] 🔑 ❌ EC rotation check failed:', error);
+    }
+  }
+
+  async triggerECKeyRotation() {
+    try {
+      // Get all Discord tabs
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      if (tabs.length === 0) {
+        console.log('🔐 [BACKGROUND] 🔑 No Discord tabs found for EC rotation');
+        return;
+      }
+      
+      // Send rotation command to all Discord tabs
+      const rotationPromises = tabs.map(tab => 
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'rotateECKeys',
+          source: 'background_timer'
+        }).catch(error => {
+          console.log(`🔐 [BACKGROUND] 🔑 Failed to send rotation to tab ${tab.id}:`, error.message);
+        })
+      );
+      
+      await Promise.all(rotationPromises);
+      console.log(`🔐 [BACKGROUND] 🔑 Sent EC rotation command to ${tabs.length} Discord tabs`);
+      
+    } catch (error) {
+      console.error('🔐 [BACKGROUND] 🔑 Failed to trigger EC rotation:', error);
+    }
+  }
+
+  async getECRotationSettings() {
+    try {
+      const result = await chrome.storage.local.get([
+        'ecEnabled',
+        'ecRotationInterval', 
+        'ecLastRotation',
+        'ecKeyGenerated'
+      ]);
+      
+      return {
+        enabled: result.ecEnabled || false,
+        intervalMs: result.ecRotationInterval || null,
+        lastRotation: result.ecLastRotation || 0,
+        keyGenerated: result.ecKeyGenerated || 0
+      };
+    } catch (error) {
+      console.error('🔐 [BACKGROUND] 🔑 Failed to get EC rotation settings:', error);
+      return { enabled: false, intervalMs: null, lastRotation: 0, keyGenerated: 0 };
+    }
+  }
+}
+
 // Initialize key rotation monitoring
-const keyRotationManager = new BackgroundKeyRotation(); 
+const keyRotationManager = new BackgroundKeyRotation();
+const ecRotationManager = new BackgroundECRotation(); 
