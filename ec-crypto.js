@@ -30,6 +30,21 @@ class ECCrypto {
       await this.loadOrGenerateStaticKeypair();
       await this.loadUserKeys();
       await this.loadCurrentUserInfo();
+      
+      // Initialize rotation timer if interval is set
+      const stored = await chrome.storage.local.get(['ecRotationInterval']);
+      if (stored.ecRotationInterval && stored.ecRotationInterval > 0) {
+        console.log('🔐 [EC] 🕐 Starting automatic rotation timer:', stored.ecRotationInterval + 'ms');
+        this.setupRotationTimer(stored.ecRotationInterval);
+      } else {
+        console.log('🔐 [EC] 🕐 No automatic rotation - manual mode');
+      }
+      
+      // Clean up old temp contacts on initialization
+      setTimeout(() => {
+        this.cleanupTempContacts();
+      }, 5000); // Wait 5 seconds after init to clean up
+      
       console.log('🔐 [EC] ✅ Crypto system initialized');
       console.log('🔐 [EC] 📊 Loaded user keys:', this.userKeys.size);
       console.log('🔐 [EC] 👤 Current user:', this.currentUsername, '(ID:', this.currentUserId + ')');
@@ -43,23 +58,47 @@ class ECCrypto {
   async loadOrGenerateStaticKeypair() {
     try {
       // Try to load existing static keypair
-      const stored = await chrome.storage.local.get(['ecStaticPrivateKey', 'ecStaticPublicKey', 'ecMyKeyId']);
+      const stored = await chrome.storage.local.get([
+        'ecStaticPrivateKey', 
+        'ecStaticPublicKey', 
+        'ecMyKeyId', 
+        'ecKeyGenerated',
+        'ecKeyEntropy',
+        'ecEntropyComponents'
+      ]);
       
       if (stored.ecStaticPrivateKey && stored.ecStaticPublicKey) {
         this.staticPrivateKey = await this.importPrivateKey(stored.ecStaticPrivateKey);
         this.staticPublicKey = await this.importPublicKey(stored.ecStaticPublicKey);
         
-        // Load stored key ID or generate it
-        this.myKeyId = stored.ecMyKeyId || this.generateKeyId(stored.ecStaticPublicKey);
+        // Always regenerate key ID from current public key to ensure consistency
+        const publicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
+        this.myKeyId = this.generateKeyId(publicKeyBase64);
         
-        // If we had to generate it, save it
-        if (!stored.ecMyKeyId) {
+        // Update stored key ID if it doesn't match
+        if (stored.ecMyKeyId !== this.myKeyId) {
           await chrome.storage.local.set({ ecMyKeyId: this.myKeyId });
+          console.log('🔐 [EC] 🔄 Updated stored Key ID to match current key');
         }
         
         console.log('🔐 [EC] 🔑 Static keypair loaded from storage');
+        
+        if (stored.ecKeyGenerated) {
+          console.log('🔐 [EC] 🕐 Key generated:', new Date(stored.ecKeyGenerated).toLocaleString());
+        }
+        if (stored.ecKeyEntropy) {
+          console.log('🔐 [EC] 🎲 Entropy hash:', stored.ecKeyEntropy.substring(0, 32) + '...');
+        }
+        if (stored.ecEntropyComponents) {
+          console.log('🔐 [EC] 🎲 Environment:', {
+            screen: stored.ecEntropyComponents.screenInfo,
+            timezone: stored.ecEntropyComponents.timezone,
+            userAgent: stored.ecEntropyComponents.userAgent
+          });
+        }
       } else {
         // Generate new static keypair
+        console.log('🔐 [EC] 🆕 No existing keypair found, generating new one...');
         await this.generateStaticKeypair();
       }
       
@@ -70,17 +109,58 @@ class ECCrypto {
       
     } catch (error) {
       console.error('🔐 [EC] ❌ Static keypair error:', error);
-      throw error;
+      // Force regeneration on error
+      console.log('🔐 [EC] 🔄 Forcing new keypair generation due to error...');
+      await this.generateStaticKeypair();
     }
   }
 
   async generateStaticKeypair() {
     console.log('🔐 [EC] 🔄 Generating new static keypair...');
     
-    // Add some randomness to ensure unique keypairs across users
-    const randomSeed = crypto.getRandomValues(new Uint8Array(32));
-    console.log('🔐 [EC] 🎲 Using random seed for unique keypair generation...');
+    // Add multiple sources of randomness to ensure unique keypairs across different browsers/users
+    const timestamp = Date.now();
+    const performanceNow = performance.now();
+    const randomSeed1 = crypto.getRandomValues(new Uint8Array(32));
+    const randomSeed2 = crypto.getRandomValues(new Uint8Array(32));
+    const randomSeed3 = crypto.getRandomValues(new Uint8Array(16));
     
+    // Browser/environment specific entropy
+    const userAgent = navigator.userAgent || 'unknown';
+    const language = navigator.language || 'unknown';
+    const platform = navigator.platform || 'unknown';
+    const screenInfo = typeof screen !== 'undefined' ? `${screen.width}x${screen.height}x${screen.colorDepth}` : 'unknown';
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown';
+    const randomMath = Math.random();
+    
+    // Create a highly unique entropy string
+    const entropyComponents = [
+      timestamp,
+      performanceNow,
+      Array.from(randomSeed1).join(''),
+      Array.from(randomSeed2).join(''),
+      Array.from(randomSeed3).join(''),
+      userAgent.substring(0, 100),
+      language,
+      platform,
+      screenInfo,
+      timezone,
+      randomMath,
+      Date.now(), // Second timestamp to ensure even millisecond differences
+      crypto.getRandomValues(new Uint8Array(8)).join('') // Last-minute randomness
+    ];
+    
+    const entropyString = entropyComponents.join('|');
+    const entropyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(entropyString));
+    const entropyHashHex = Array.from(new Uint8Array(entropyHash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    console.log('🔐 [EC] 🎲 Using ENHANCED entropy for unique keypair generation...');
+    console.log('🔐 [EC] 🎲 Entropy hash:', entropyHashHex.substring(0, 32) + '...');
+    console.log('🔐 [EC] 🎲 Timestamp:', timestamp);
+    console.log('🔐 [EC] 🎲 Screen:', screenInfo);
+    console.log('🔐 [EC] 🎲 Timezone:', timezone);
+    
+    // Generate the actual keypair (crypto.subtle.generateKey is already cryptographically random)
     const keypair = await crypto.subtle.generateKey(
       {
         name: this.algorithm,
@@ -103,11 +183,22 @@ class ECCrypto {
     await chrome.storage.local.set({
       ecStaticPrivateKey: exportedPrivate,
       ecStaticPublicKey: exportedPublic,
-      ecMyKeyId: this.myKeyId
+      ecMyKeyId: this.myKeyId,
+      ecKeyGenerated: timestamp,
+      ecKeyEntropy: entropyHashHex.substring(0, 64), // Store entropy hash for debugging
+      ecEntropyComponents: {
+        timestamp,
+        screenInfo,
+        timezone,
+        userAgent: userAgent.substring(0, 50)
+      }
     });
     
     console.log('🔐 [EC] ✅ New static keypair generated and stored');
     console.log('🔐 [EC] 🔑 My Key ID:', this.myKeyId);
+    console.log('🔐 [EC] 🔑 Public Key Preview:', exportedPublic.substring(0, 32) + '...');
+    console.log('🔐 [EC] 🕐 Generated at:', new Date(timestamp).toLocaleString());
+    console.log('🔐 [EC] 🔍 Key uniqueness check: Key ID should be different for each user');
   }
 
   // ==================== CURRENT USER IDENTIFICATION ====================
@@ -156,7 +247,7 @@ class ECCrypto {
 
   // ==================== USER KEY DISCOVERY & STORAGE ====================
 
-  addUserKey(userId, publicKeyBase64, username = 'Unknown') {
+  async addUserKey(userId, publicKeyBase64, username = 'Unknown') {
     const keyId = this.generateKeyId(publicKeyBase64);
     
     // Prevent storing if this is our current user ID (primary check)
@@ -171,22 +262,264 @@ class ECCrypto {
       return false;
     }
     
+    // Check if we already have this user but with a different key (key rotation scenario)
+    const existingUser = this.userKeys.get(userId);
+    if (existingUser && existingUser.keyId !== keyId) {
+      // Much longer cooldown to prevent spam - real rotations shouldn't happen this frequently
+      const rotationCooldown = 5 * 60 * 1000; // 5 minutes minimum
+      const timeSinceLastRotation = Date.now() - (existingUser.rotatedAt || existingUser.discoveredAt || 0);
+      
+      if (timeSinceLastRotation < rotationCooldown) {
+        console.log('🔐 [EC] ⏰ Key rotation cooldown active - ignoring rotation attempt');
+        console.log('🔐 [EC] ⏰ Old Key ID:', existingUser.keyId, '→ New Key ID:', keyId);
+        console.log('🔐 [EC] ⏰ Time since last rotation:', Math.round(timeSinceLastRotation / 1000), 'seconds');
+        console.log('🔐 [EC] ⏰ Cooldown remaining:', Math.round((rotationCooldown - timeSinceLastRotation) / 1000), 'seconds');
+        
+        // Just update last seen without triggering rotation
+        existingUser.lastSeen = Date.now();
+        this.userKeys.set(userId, existingUser);
+        await this.saveUserKeys();
+        return true;
+      }
+      
+      // Check if keys are just similar variations (not genuine rotation)
+      if (this.areKeysSimilar(existingUser.keyId, keyId)) {
+        console.log('🔐 [EC] 🔑 Keys are too similar - treating as same key');
+        console.log('🔐 [EC] 🔑 Existing:', existingUser.keyId);
+        console.log('🔐 [EC] 🔑 New:', keyId);
+        
+        // Update last seen but don't rotate
+        existingUser.lastSeen = Date.now();
+        this.userKeys.set(userId, existingUser);
+        await this.saveUserKeys();
+        return true;
+      }
+      
+      console.log('🔐 [EC] 🔄 LEGITIMATE KEY ROTATION DETECTED!');
+      console.log('🔐 [EC] 👤 User:', username, '(ID:', userId + ')');
+      console.log('🔐 [EC] 🔑 Old Key ID:', existingUser.keyId);
+      console.log('🔐 [EC] 🔑 New Key ID:', keyId);
+      
+      // Update with new key but preserve discovery time
+      const userInfo = {
+        publicKey: publicKeyBase64,
+        keyId: keyId,
+        username: username !== 'Unknown' ? username : existingUser.username, // Preserve good username
+        lastSeen: Date.now(),
+        discoveredAt: existingUser.discoveredAt, // Keep original discovery time
+        rotatedAt: Date.now(), // Mark when rotation was detected
+        previousKeyId: existingUser.keyId // Store previous key for reference
+      };
+      
+      this.userKeys.set(userId, userInfo);
+      await this.saveUserKeys();
+      
+      console.log('🔐 [EC] ✅ User key updated after rotation');
+      return true;
+    }
+    
+    // Enhanced logic for handling missing user IDs
+    if (!userId || userId === 'null' || userId === null || userId.startsWith('temp_')) {
+      console.log('🔐 [EC] 🔍 No valid user ID provided, checking for existing keys...');
+      
+      // First, look for existing user with same key ID
+      for (const [existingUserId, existingUserInfo] of this.userKeys) {
+        if (existingUserInfo.keyId === keyId) {
+          console.log('🔐 [EC] 🔄 Found existing user with same key ID:', existingUserId);
+          // Update this user's last seen time and username if better
+          existingUserInfo.lastSeen = Date.now();
+          if (username !== 'Unknown' && username !== existingUserInfo.username) {
+            existingUserInfo.username = username;
+            console.log('🔐 [EC] 📝 Updated username for existing user');
+          }
+          await this.saveUserKeys();
+          return true;
+        }
+      }
+      
+      // Enhanced temp contact logic - be more conservative
+      // Only create temp contact if we have very few contacts total
+      const tempContactCount = Array.from(this.userKeys.keys()).filter(id => id.startsWith('temp_')).length;
+      const totalContactCount = this.userKeys.size;
+      
+      if (tempContactCount >= 3) {
+        console.log('🔐 [EC] ⚠️ Too many temp contacts already (', tempContactCount, '), not creating another');
+        return false;
+      }
+      
+      if (totalContactCount >= 10) {
+        console.log('🔐 [EC] ⚠️ Too many total contacts (', totalContactCount, '), not creating temp contact');
+        return false;
+      }
+      
+      // Check if we recently created a temp contact with a similar key ID
+      const recentTempContact = this.findRecentTempContact(keyId);
+      if (recentTempContact) {
+        console.log('🔐 [EC] ⚠️ Recent temp contact exists with similar key, updating instead of creating new');
+        recentTempContact.lastSeen = Date.now();
+        recentTempContact.keyId = keyId;
+        recentTempContact.publicKey = publicKeyBase64;
+        await this.saveUserKeys();
+        return true;
+      }
+      
+      // If all checks pass, create a temporary entry with key ID as identifier
+      const tempUserId = `temp_${keyId}`;
+      console.log('🔐 [EC] 🆕 Creating temporary user entry:', tempUserId);
+      console.log('🔐 [EC] 📊 Current temp contacts:', tempContactCount, '/ total contacts:', totalContactCount);
+      
+      const userInfo = {
+        publicKey: publicKeyBase64,
+        keyId: keyId,
+        username: username,
+        lastSeen: Date.now(),
+        discoveredAt: Date.now(),
+        addedAt: Date.now(),
+        isTemporary: true // Mark as temporary contact
+      };
+      
+      this.userKeys.set(tempUserId, userInfo);
+      await this.saveUserKeys();
+      
+      console.log('🔐 [EC] 🆕 TEMP KEY STORED!');
+      return true;
+    }
+    
+    // Before adding new user, check if we have temp contacts with similar keys to merge
+    await this.mergeAnyTempContactsWithRealUser(userId, username, keyId);
+    
     const userInfo = {
       publicKey: publicKeyBase64,
       keyId: keyId,
       username: username,
       lastSeen: Date.now(),
-      discoveredAt: Date.now()
+      discoveredAt: Date.now(),
+      addedAt: Date.now()
     };
     
     this.userKeys.set(userId, userInfo);
-    this.saveUserKeys();
+    await this.saveUserKeys();
     
     console.log('🔐 [EC] 👤 NEW USER DISCOVERED!');
     console.log('🔐 [EC] 🆔 User ID:', userId);
     console.log('🔐 [EC] 👤 Username:', username);
     console.log('🔐 [EC] 🔑 Key ID:', keyId);
     console.log('🔐 [EC] 📊 Total users:', this.userKeys.size);
+    return true;
+  }
+
+  // Helper method to find recent temp contacts with similar keys
+  findRecentTempContact(newKeyId) {
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    
+    for (const [userId, userInfo] of this.userKeys) {
+      if (userId.startsWith('temp_') && 
+          userInfo.lastSeen > fiveMinutesAgo &&
+          userInfo.keyId && 
+          this.areKeysSimilar(userInfo.keyId, newKeyId)) {
+        return userInfo;
+      }
+    }
+    return null;
+  }
+
+  // Helper method to check if two key IDs are similar (might be from same user)
+  areKeysSimilar(keyId1, keyId2) {
+    if (!keyId1 || !keyId2) return false;
+    if (keyId1 === keyId2) return true;
+    
+    // Check if they share significant portion (might be rotation)
+    const commonLength = Math.min(keyId1.length, keyId2.length);
+    let matches = 0;
+    for (let i = 0; i < commonLength; i++) {
+      if (keyId1[i] === keyId2[i]) matches++;
+    }
+    
+    // If more than 60% similar, consider them related
+    return (matches / commonLength) > 0.6;
+  }
+
+  // Method to clean up old temp contacts
+  async cleanupTempContacts() {
+    console.log('🔐 [EC] 🧹 Cleaning up old temp contacts...');
+    
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    let removedCount = 0;
+    
+    for (const [userId, userInfo] of this.userKeys) {
+      if (userId.startsWith('temp_') && userInfo.lastSeen < oneHourAgo) {
+        console.log('🔐 [EC] 🗑️ Removing old temp contact:', userId, '- Last seen:', new Date(userInfo.lastSeen).toLocaleTimeString());
+        this.userKeys.delete(userId);
+        removedCount++;
+      }
+    }
+    
+    if (removedCount > 0) {
+      await this.saveUserKeys();
+      console.log('🔐 [EC] ✅ Removed', removedCount, 'old temp contacts');
+    } else {
+      console.log('🔐 [EC] ✅ No old temp contacts to remove');
+    }
+    
+    return removedCount;
+  }
+
+  // Method to check and merge any temp contacts that might belong to this real user
+  async mergeAnyTempContactsWithRealUser(realUserId, realUsername, realKeyId) {
+    console.log('🔐 [EC] 🔍 Checking for temp contacts to merge with real user:', realUserId);
+    
+    let mergedCount = 0;
+    const tempContactsToRemove = [];
+    
+    for (const [tempUserId, tempUserInfo] of this.userKeys) {
+      if (tempUserId.startsWith('temp_') && 
+          (tempUserInfo.keyId === realKeyId || this.areKeysSimilar(tempUserInfo.keyId, realKeyId))) {
+        console.log('🔐 [EC] 🔄 Found temp contact to merge:', tempUserId, '→', realUserId);
+        tempContactsToRemove.push(tempUserId);
+        mergedCount++;
+      }
+    }
+    
+    // Remove the temp contacts
+    for (const tempUserId of tempContactsToRemove) {
+      this.userKeys.delete(tempUserId);
+      console.log('🔐 [EC] 🗑️ Removed temp contact:', tempUserId);
+    }
+    
+    if (mergedCount > 0) {
+      await this.saveUserKeys();
+      console.log('🔐 [EC] ✅ Merged', mergedCount, 'temp contacts with real user');
+    }
+    
+    return mergedCount;
+  }
+
+  // Method to merge temp contact with real user ID
+  async mergeTempContactWithRealUser(tempUserId, realUserId, realUsername) {
+    const tempContact = this.userKeys.get(tempUserId);
+    if (!tempContact) {
+      console.log('🔐 [EC] ❌ Temp contact not found:', tempUserId);
+      return false;
+    }
+    
+    console.log('🔐 [EC] 🔄 Merging temp contact with real user...');
+    console.log('🔐 [EC] 🔄 Temp:', tempUserId, '→ Real:', realUserId, '(' + realUsername + ')');
+    
+    // Remove temp contact
+    this.userKeys.delete(tempUserId);
+    
+    // Add as real user, preserving discovery info
+    const realUserInfo = {
+      ...tempContact,
+      username: realUsername || tempContact.username,
+      mergedFrom: tempUserId,
+      mergedAt: Date.now()
+    };
+    
+    this.userKeys.set(realUserId, realUserInfo);
+    await this.saveUserKeys();
+    
+    console.log('🔐 [EC] ✅ Successfully merged temp contact to real user');
     return true;
   }
 
@@ -202,7 +535,7 @@ class ECCrypto {
 
   getMostRecentUserKey() {
     if (this.userKeys.size === 0) {
-      console.log('🔐 [EC] ❌ No user keys available');
+      // console.log('🔐 [EC] ❌ No user keys available');
       return null;
     }
     
@@ -217,10 +550,162 @@ class ECCrypto {
     }
     
     if (mostRecent) {
-      console.log('🔐 [EC] 🎯 Most recent user key:', mostRecent.userId, '- Key ID:', mostRecent.keyId);
+      // console.log('🔐 [EC] 🎯 Most recent user key:', mostRecent.userId, '- Key ID:', mostRecent.keyId);
     }
     
     return mostRecent;
+  }
+
+  // ========== NEW METHODS FOR OPTIONS PAGE SUPPORT ==========
+
+  async getCurrentKeyInfo() {
+    try {
+      if (!this.staticPublicKey) {
+        throw new Error('No static public key available');
+      }
+
+      const publicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
+      const keyId = this.generateKeyId(publicKeyBase64);
+      
+      // Get stored key creation time
+      const stored = await chrome.storage.local.get(['ecKeyCreated', 'ecRotationInterval']);
+      
+      return {
+        keyId: keyId,
+        publicKey: publicKeyBase64,
+        created: stored.ecKeyCreated || Date.now(),
+        nextRotation: this.calculateNextRotation(stored.ecKeyCreated, stored.ecRotationInterval)
+      };
+    } catch (error) {
+      throw new Error('Failed to get current key info: ' + error.message);
+    }
+  }
+
+  calculateNextRotation(created, intervalMs) {
+    if (!intervalMs || intervalMs === null) {
+      return null; // Manual rotation only
+    }
+    
+    const createdTime = created || Date.now();
+    return createdTime + intervalMs;
+  }
+
+  async getContactList() {
+    try {
+      const contacts = [];
+      
+      if (this.userKeys && this.userKeys.size > 0) {
+        for (const [userId, userInfo] of this.userKeys) {
+          contacts.push({
+            id: userId,
+            discordUserId: userId,
+            username: userInfo.username || 'Unknown User',
+            keyId: userInfo.keyId,
+            publicKey: userInfo.publicKey,
+            discoveredAt: userInfo.addedAt || Date.now()
+          });
+        }
+      }
+      
+      return contacts;
+    } catch (error) {
+      console.error('Failed to get contact list:', error);
+      return [];
+    }
+  }
+
+  async clearAllContacts() {
+    try {
+      this.userKeys.clear();
+      await chrome.storage.local.set({ ecUserKeys: {} });
+      // console.log('🔐 [EC] All contacts cleared');
+    } catch (error) {
+      console.error('Failed to clear contacts:', error);
+      throw error;
+    }
+  }
+
+  async updateRotationInterval(intervalMs) {
+    try {
+      if (intervalMs === null) {
+        // Manual rotation only
+        await chrome.storage.local.set({
+          ecRotationInterval: null,
+          ecAutoRotation: false
+        });
+      } else {
+        // Automatic rotation
+        await chrome.storage.local.set({
+          ecRotationInterval: intervalMs,
+          ecAutoRotation: true
+        });
+        
+        // Restart rotation timer if needed
+        this.setupRotationTimer(intervalMs);
+      }
+      
+      // console.log('🔐 [EC] Rotation interval updated:', intervalMs);
+    } catch (error) {
+      console.error('Failed to update rotation interval:', error);
+      throw error;
+    }
+  }
+
+  async rotateKeysNow() {
+    try {
+      console.log('🔐 [EC] 🔄 Manual key rotation initiated...');
+      
+      // Store old key info for debugging
+      const oldKeyId = this.myKeyId;
+      
+      // Clear cached keys first to force regeneration
+      this.staticPrivateKey = null;
+      this.staticPublicKey = null;
+      this.myKeyId = null;
+      
+      // Generate completely new keypair
+      await this.generateStaticKeypair();
+      
+      // Update creation time and rotation info
+      const rotationTime = Date.now();
+      await chrome.storage.local.set({ 
+        ecKeyCreated: rotationTime,
+        ecLastRotation: rotationTime,
+        ecRotationCount: (await chrome.storage.local.get('ecRotationCount')).ecRotationCount + 1 || 1
+      });
+      
+      console.log('🔐 [EC] ✅ Keys rotated successfully');
+      console.log('🔐 [EC] 🔄 Old Key ID:', oldKeyId);
+      console.log('🔐 [EC] 🔄 New Key ID:', this.myKeyId);
+      console.log('🔐 [EC] 🕐 Rotation time:', new Date(rotationTime).toLocaleTimeString());
+      
+      // Force reload to ensure new keys are used
+      await this.loadOrGenerateStaticKeypair();
+      
+    } catch (error) {
+      console.error('Failed to rotate keys:', error);
+      throw error;
+    }
+  }
+
+  setupRotationTimer(intervalMs) {
+    // Clear existing timer
+    if (this.rotationTimer) {
+      clearTimeout(this.rotationTimer);
+    }
+    
+    if (!intervalMs) return;
+    
+    // Set new timer
+    this.rotationTimer = setTimeout(async () => {
+      try {
+        await this.rotateKeysNow();
+        // Setup next rotation
+        this.setupRotationTimer(intervalMs);
+      } catch (error) {
+        console.error('Automatic key rotation failed:', error);
+      }
+    }, intervalMs);
   }
 
   async saveUserKeys() {
@@ -443,7 +928,7 @@ class ECCrypto {
           const existing = this.userKeys.get(senderUserId);
           if (!existing || existing.keyId !== senderKeyId) {
             // New or updated key for this user
-            const added = this.addUserKey(senderUserId, senderPublicKeyBase64, existing?.username || 'Unknown');
+            const added = await this.addUserKey(senderUserId, senderPublicKeyBase64, existing?.username || 'Unknown');
             if (added) {
               console.log('🔐 [EC] 📝 Stored new key for user:', senderUserId);
             }
@@ -515,8 +1000,26 @@ class ECCrypto {
   }
 
   generateKeyId(publicKeyBase64) {
-    // Simple hash of public key for identification
-    return btoa(publicKeyBase64.substring(0, 16)).substring(0, 12);
+    // Generate a unique hash-based ID from the full public key
+    // Include timestamp and randomness to ensure uniqueness
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString();
+    const combined = publicKeyBase64 + timestamp + random;
+    
+    // Create a better hash
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Convert to base64-like string and ensure it's 12 chars
+    const hashStr = Math.abs(hash).toString(36);
+    const keyStr = publicKeyBase64.substring(publicKeyBase64.length - 8);
+    const combined2 = hashStr + keyStr;
+    
+    return btoa(combined2).replace(/[^A-Za-z0-9]/g, '').substring(0, 12).padEnd(12, 'X');
   }
 
   async exportPublicKey(publicKey) {

@@ -399,36 +399,142 @@
                 <div style="margin-bottom: 12px;">
                     <label class="label" style="font-size: 14px;">Key Rotation Interval</label>
                     <select id="ec-rotation-interval" class="input" style="font-size: 14px; padding: 10px;">
-                        <option value="900000">15 Minutes (High Security)</option>
                         <option value="3600000" selected>1 Hour (Recommended)</option>
-                        <option value="21600000">6 Hours (Balanced)</option>
-                        <option value="86400000">1 Day (Low Security)</option>
+                        <option value="1800000">30 Minutes</option>
+                        <option value="900000">15 Minutes</option>
+                        <option value="300000">5 Minutes</option>
+                        <option value="60000">1 Minute</option>
+                        <option value="30000">30 Seconds</option>
+                        <option value="10000">10 Seconds (Demo)</option>
+                        <option value="manual">Manual Only</option>
                     </select>
                     <div style="font-size: 12px; color: #666; margin-top: 4px;">
                         How often to rotate your private key for forward secrecy
                     </div>
                 </div>
 
-                <div style="margin-bottom: 12px;">
-                    <button id="rotate-keys-now" class="button secondary" style="font-size: 14px; padding: 10px;">
-                        🔄 Rotate Keys Now
-                    </button>
-                    <button id="view-contacts" class="button secondary" style="font-size: 14px; padding: 10px; margin-left: 8px;">
-                        👥 View Contacts
-                    </button>
+                <!-- Key Management Section -->
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px; color: #333;">🔑 Current Key Information</div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 12px; margin-bottom: 12px;">
+                        <div style="font-weight: 500;">Key ID:</div>
+                        <div id="current-key-id" style="font-family: monospace; background: white; padding: 4px 8px; border-radius: 4px;">Loading...</div>
+                        
+                        <div style="font-weight: 500;">Created:</div>
+                        <div id="key-created" style="background: white; padding: 4px 8px; border-radius: 4px;">Loading...</div>
+                        
+                        <div style="font-weight: 500;">Next Rotation:</div>
+                        <div id="next-rotation" style="background: white; padding: 4px 8px; border-radius: 4px;">N/A</div>
+                        
+                        <div style="font-weight: 500;">Contacts:</div>
+                        <div id="contact-count" style="background: white; padding: 4px 8px; border-radius: 4px;">0</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-weight: 500; margin-bottom: 4px; font-size: 12px;">Public Key:</div>
+                        <textarea id="my-public-key" readonly style="width: 100%; height: 60px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white; resize: none;" placeholder="Loading..."></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button id="rotate-keys-now" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1;">
+                            🔄 Rotate Keys Now
+                        </button>
+                        <button id="export-public-key" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1;">
+                            📋 Copy Public Key
+                        </button>
+                        <button id="clear-all-contacts" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #dc3545; color: white;">
+                            🗑️ Clear Contacts
+                        </button>
+                    </div>
                 </div>
 
-                <div id="asymmetric-status" style="font-size: 12px; color: #666; background: #f8f9fa; padding: 12px; border-radius: 6px;">
+                <!-- Contacts Section -->
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-weight: 600; color: #333;">👥 Discovered Contacts</div>
+                        <button id="view-contacts" class="button secondary" style="font-size: 11px; padding: 6px 10px;">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    
+                    <div id="contact-list-content" style="font-size: 11px; max-height: 120px; overflow-y: auto;">
+                        <div style="color: #666; text-align: center; padding: 20px;">
+                            No contacts discovered yet. Send an encrypted message to discover contacts automatically.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proof of Concept Section -->
+                <div style="background: #e8f5e8; border-radius: 8px; padding: 16px; border-left: 4px solid #28a745;">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: #155724;">🧪 Proof of Concept - ECDH Security</div>
+                    <div style="font-size: 12px; line-height: 1.4; color: #155724; margin-bottom: 12px;">
+                        Elliptic Curve Diffie-Hellman requires <strong>both keys</strong> to encrypt/decrypt. Without your private key AND the recipient's public key, messages cannot be decrypted - demonstrating perfect forward secrecy.
+                    </div>
+                    
+                    <div style="margin-bottom: 8px;">
+                        <input type="text" id="demo-message" placeholder="Enter test message..." value="Hello, this is a test!" style="width: 100%; padding: 8px; border: 1px solid #c3e6cb; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <button id="test-encrypt" class="button secondary" style="font-size: 11px; padding: 6px 10px; flex: 1; background: #28a745; color: white;">
+                            🔐 Test Encrypt
+                        </button>
+                        <button id="test-decrypt" class="button secondary" style="font-size: 11px; padding: 6px 10px; flex: 1; background: #17a2b8; color: white;">
+                            🔓 Test Decrypt
+                        </button>
+                    </div>
+                    
+                    <div style="font-size: 10px;">
+                        <div style="margin-bottom: 4px; font-weight: 500;">Encrypted Result:</div>
+                        <textarea id="encrypted-result" readonly style="width: 100%; height: 40px; font-family: monospace; font-size: 9px; padding: 4px; border: 1px solid #c3e6cb; border-radius: 4px; background: white; resize: none;" placeholder="Click 'Test Encrypt' to see result..."></textarea>
+                        
+                        <div style="margin: 8px 0 4px 0; font-weight: 500;">Decrypted Result:</div>
+                        <textarea id="decrypted-result" readonly style="width: 100%; height: 40px; font-family: monospace; font-size: 9px; padding: 4px; border: 1px solid #c3e6cb; border-radius: 4px; background: white; resize: none;" placeholder="Click 'Test Decrypt' to see result..."></textarea>
+                    </div>
+                </div>
+
+                <div id="asymmetric-status" style="font-size: 12px; color: #666; background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 12px;">
                     <div>Status: <span id="ec-status-text">Initializing...</span></div>
-                    <div>Current Key ID: <span id="current-key-id">-</span></div>
-                    <div>Contacts: <span id="contact-count">0</span></div>
-                    <div>Next Rotation: <span id="next-rotation">-</span></div>
                 </div>
+            </div>
+        </div>
 
-                <div id="contact-list" style="display: none; margin-top: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px;">
-                    <div style="font-weight: 600; margin-bottom: 8px;">📞 Discovered Contacts</div>
-                    <div id="contact-list-content" style="font-size: 11px; font-family: monospace; max-height: 100px; overflow-y: auto;"></div>
-                </div>
+        <!-- Debug & Fix Tools Section -->
+        <div class="key-info" style="background: linear-gradient(135deg, #ff6b6b, #ee5a52); color: white;">
+            <div style="font-weight: 600; margin-bottom: 12px; color: white;">🔧 Debug & Quick Fixes</div>
+            <div style="font-size: 12px; line-height: 1.4; margin-bottom: 16px; opacity: 0.9;">
+                Use these tools to fix common issues with key synchronization and message decryption:
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <button id="debug-key-status" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                    📊 Debug Keys
+                </button>
+                <button id="force-unique-keys" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                    🔑 Force Unique
+                </button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+                <button id="fix-after-rotation" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                    🔄 Fix Rotation
+                </button>
+                <button id="cleanup-temp-contacts" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                    🧹 Clean Temps
+                </button>
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <div style="font-weight: 500; margin-bottom: 4px; font-size: 12px; color: white;">Debug Output:</div>
+                <textarea id="debug-log" readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(0,0,0,0.3); color: #fff; resize: vertical;" placeholder="Debug information will appear here when you click the buttons above..."></textarea>
+            </div>
+            
+            <div style="font-size: 11px; opacity: 0.8; line-height: 1.3;">
+                <strong>Debug Keys:</strong> Shows current key status and contact info<br>
+                <strong>Force Unique:</strong> Regenerates keys with better entropy (fixes identical Key IDs)<br>
+                <strong>Fix Rotation:</strong> Clears contacts and resets after key rotation issues<br>
+                <strong>Clean Temps:</strong> Removes old temporary contacts (fixes temp contact buildup)
             </div>
         </div>
 

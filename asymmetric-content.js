@@ -88,14 +88,14 @@ class AsymmetricContentIntegration {
       console.log('🔐 [ASYMMETRIC] 📦 Message length:', chineseMessage.length);
       
       // First scan for public keys to update our user database
-      const publicKeyDetected = this.ecProcessor.scanMessageForPublicKeys(chineseMessage, messageElement);
+      const publicKeyDetected = await this.ecProcessor.scanMessageForPublicKeys(chineseMessage, messageElement);
       
       if (publicKeyDetected) {
         console.log('🔐 [ASYMMETRIC] 🔍 Public key detected and stored!');
       }
       
       // Extract sender info from message element
-      const senderInfo = messageElement ? this.ecProcessor.extractDiscordUserInfo(messageElement) : { userId: null, username: 'Unknown' };
+      const senderInfo = messageElement ? await this.ecProcessor.extractDiscordUserInfo(messageElement) : { userId: null, username: 'Unknown' };
       console.log('🔐 [ASYMMETRIC] 👤 Sender info:', senderInfo);
       
       // Attempt to decrypt the message

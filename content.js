@@ -195,7 +195,7 @@ class DiscordCryptochat {
   }
 
   setupMessageListeners() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'updateAutoEncrypt') {
         this.autoEncryptEnabled = request.enabled;
         
@@ -208,7 +208,7 @@ class DiscordCryptochat {
         // Update current user info for asymmetric encryption
         if (window.ecCrypto) {
           window.ecCrypto.setCurrentUser(request.userId, request.username);
-          console.log('🔐 [CRYPTO] 👤 Current user updated:', request.username, '(ID:', request.userId + ')');
+          // console.log('🔐 [CRYPTO] 👤 Current user updated:', request.username, '(ID:', request.userId + ')');
         }
         
         sendResponse({ success: true });
@@ -234,6 +234,86 @@ class DiscordCryptochat {
         this.restartDecryptionWithNewSpeed();
         
         sendResponse({ success: true });
+      } else if (request.action === 'getCurrentKeyInfo') {
+        // Return current key information for options page
+        this.handleGetCurrentKeyInfo(sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'getContactList') {
+        // Return contact list for options page
+        this.handleGetContactList(sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'clearAllContacts') {
+        // Clear all contacts
+        this.handleClearAllContacts(sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'testEncryption') {
+        // Test encryption with given message
+        this.handleTestEncryption(request.message, sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'testDecryption') {
+        // Test decryption with given encrypted text
+        this.handleTestDecryption(request.encryptedText, sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'updateECRotationInterval') {
+        // Update EC rotation interval
+        this.handleUpdateECRotationInterval(request.intervalMs, sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'rotateKeys') {
+        // Manually rotate keys
+        this.handleRotateKeys(sendResponse);
+        return true; // Keep channel open for async response
+      } else if (request.action === 'debugKeyStatus') {
+        // Debug key status
+        try {
+          if (typeof window.debugKeyStatus === 'function') {
+            window.debugKeyStatus();
+            sendResponse({ success: true });
+          } else {
+            sendResponse({ success: false, error: 'debugKeyStatus function not available' });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        return true;
+      } else if (request.action === 'forceUniqueKeys') {
+        // Force unique key generation
+        try {
+          if (typeof window.forceUniqueKeys === 'function') {
+            await window.forceUniqueKeys();
+            sendResponse({ success: true });
+          } else {
+            sendResponse({ success: false, error: 'forceUniqueKeys function not available' });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        return true;
+      } else if (request.action === 'fixAfterRotation') {
+        // Fix after rotation
+        try {
+          if (typeof window.fixAfterRotation === 'function') {
+            await window.fixAfterRotation();
+            sendResponse({ success: true });
+          } else {
+            sendResponse({ success: false, error: 'fixAfterRotation function not available' });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        return true;
+      } else if (request.action === 'cleanupTempContacts') {
+        // Cleanup temp contacts
+        try {
+          if (window.ecCrypto && typeof window.ecCrypto.cleanupTempContacts === 'function') {
+            const removedCount = await window.ecCrypto.cleanupTempContacts();
+            sendResponse({ success: true, removedCount: removedCount });
+          } else {
+            sendResponse({ success: false, error: 'cleanupTempContacts function not available' });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        return true;
       }
     });
   }
@@ -433,35 +513,35 @@ class DiscordCryptochat {
       let encryptionMethod = 'unknown';
       let encryptionDetails = {};
 
-      console.log('🔐 [ENCRYPT] 📤 Encrypting outgoing message...');
-      console.log('🔐 [ENCRYPT] Original message:', actualMessage);
+      // console.log('🔐 [ENCRYPT] 📤 Encrypting outgoing message...');
+      // console.log('🔐 [ENCRYPT] Original message:', actualMessage);
 
       // Try asymmetric encryption first if available
       if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
-        console.log('🔐 [ENCRYPT] 🔐 Trying asymmetric encryption...');
+        // console.log('🔐 [ENCRYPT] 🔐 Trying asymmetric encryption...');
         try {
           const asymmetricResult = await this.encryptAsymmetricMessage(actualMessage);
           if (asymmetricResult && asymmetricResult.success) {
             encryptedMessage = asymmetricResult.encryptedText;
             encryptionMethod = 'asymmetric';
             encryptionDetails = asymmetricResult.details || {};
-            console.log('🔐 [ENCRYPT] ✅ Asymmetric encryption SUCCESS!');
-            console.log('🔐 [ENCRYPT] Details:', encryptionDetails);
-            console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+            // console.log('🔐 [ENCRYPT] ✅ Asymmetric encryption SUCCESS!');
+            // console.log('🔐 [ENCRYPT] Details:', encryptionDetails);
+            // console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
           } else {
-            console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption failed, trying symmetric...');
+            // console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption failed, trying symmetric...');
           }
         } catch (asymmetricError) {
-          console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error:', asymmetricError.message);
+          // console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error:', asymmetricError.message);
         }
       } else {
-        console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available');
+        // console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available');
       }
 
       // Fallback to symmetric encryption if asymmetric failed or unavailable
       if (!encryptedMessage) {
         if (!this.encryptionKey) {
-          console.log('🔐 [ENCRYPT] ❌ No symmetric encryption key available');
+          // console.log('🔐 [ENCRYPT] ❌ No symmetric encryption key available');
           event.preventDefault();
           event.stopPropagation();
           this.showKeyWarning();
@@ -469,12 +549,12 @@ class DiscordCryptochat {
           return;
         }
         
-        console.log('🔐 [ENCRYPT] 🔑 Using symmetric encryption...');
+        // console.log('🔐 [ENCRYPT] 🔑 Using symmetric encryption...');
         encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
         encryptionMethod = 'symmetric';
         encryptionDetails = { keyType: 'shared_secret' };
-        console.log('🔐 [ENCRYPT] ✅ Symmetric encryption SUCCESS!');
-        console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+        // console.log('🔐 [ENCRYPT] ✅ Symmetric encryption SUCCESS!');
+        // console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
       }
 
       const finalMessage = encryptionMethod === 'asymmetric' ? encryptedMessage : this.encodeStealthMessage(encryptedMessage);
@@ -773,50 +853,50 @@ class DiscordCryptochat {
       let decryptionMethod = 'unknown';
       let decryptionDetails = {};
       
-      console.log('🔐 [DECRYPT] 📨 Processing encrypted message...');
-      console.log('🔐 [DECRYPT] Message preview:', messageText.substring(0, 100) + '...');
+      // console.log('🔐 [DECRYPT] 📨 Processing encrypted message...');
+      // console.log('🔐 [DECRYPT] Message preview:', messageText.substring(0, 100) + '...');
       
       // Try asymmetric decryption first if available
       if (this.processAsymmetricMessage && typeof this.processAsymmetricMessage === 'function') {
-        console.log('🔐 [DECRYPT] 🔐 Trying asymmetric decryption...');
+        // console.log('🔐 [DECRYPT] 🔐 Trying asymmetric decryption...');
         try {
           const asymmetricResult = await this.processAsymmetricMessage(messageText, messageContent);
           if (asymmetricResult && asymmetricResult.success) {
             decryptedMessage = asymmetricResult.decryptedText;
             decryptionMethod = 'asymmetric';
             decryptionDetails = asymmetricResult.details || {};
-            console.log('🔐 [DECRYPT] ✅ Asymmetric decryption SUCCESS!');
-            console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
-            console.log('🔐 [DECRYPT] Details:', decryptionDetails);
+            // console.log('🔐 [DECRYPT] ✅ Asymmetric decryption SUCCESS!');
+            // console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
+            // console.log('🔐 [DECRYPT] Details:', decryptionDetails);
           } else {
-            console.log('🔐 [DECRYPT] ❌ Asymmetric decryption failed, trying symmetric...');
+            // console.log('🔐 [DECRYPT] ❌ Asymmetric decryption failed, trying symmetric...');
           }
         } catch (asymmetricError) {
-          console.log('🔐 [DECRYPT] ❌ Asymmetric decryption error:', asymmetricError.message);
+          // console.log('🔐 [DECRYPT] ❌ Asymmetric decryption error:', asymmetricError.message);
         }
       } else {
-        console.log('🔐 [DECRYPT] ⚠️ Asymmetric decryption not available');
+        // console.log('🔐 [DECRYPT] ⚠️ Asymmetric decryption not available');
       }
       
       // Fallback to symmetric decryption if asymmetric failed or unavailable
       if (!decryptedMessage && this.encryptionKey) {
-        console.log('🔐 [DECRYPT] 🔑 Trying symmetric decryption...');
+        // console.log('🔐 [DECRYPT] 🔑 Trying symmetric decryption...');
         try {
           // Decode the stealth message to get base64
           const encryptedPayload = this.decodeStealthMessage(messageText);
-          console.log('🔐 [DECRYPT] Decoded payload length:', encryptedPayload.length);
+          // console.log('🔐 [DECRYPT] Decoded payload length:', encryptedPayload.length);
           
           // Decrypt the message using symmetric encryption
           decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
           decryptionMethod = 'symmetric';
           decryptionDetails = { keyType: 'shared_secret' };
-          console.log('🔐 [DECRYPT] ✅ Symmetric decryption SUCCESS!');
-          console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
+          // console.log('🔐 [DECRYPT] ✅ Symmetric decryption SUCCESS!');
+          // console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
         } catch (symmetricError) {
-          console.log('🔐 [DECRYPT] ❌ Symmetric decryption failed:', symmetricError.message);
+          // console.log('🔐 [DECRYPT] ❌ Symmetric decryption failed:', symmetricError.message);
         }
       } else if (!this.encryptionKey) {
-        console.log('🔐 [DECRYPT] ⚠️ No symmetric encryption key available');
+        // console.log('🔐 [DECRYPT] ⚠️ No symmetric encryption key available');
       }
       
       if (decryptedMessage) {
@@ -1188,14 +1268,14 @@ class DiscordCryptochat {
   }
 
   base64ToChinese(base64) {
-    // Take base64 string and convert each character to a Chinese character
+    // Take base64 string and convert each character to a Chinese character using simple, reversible mapping
     let result = '';
     const baseCharCode = 0x4E00; // Start of CJK unified ideographs
     
     for (let i = 0; i < base64.length; i++) {
       const charCode = base64.charCodeAt(i);
-      // Map ASCII range to Chinese characters
-      const chineseCharCode = baseCharCode + (charCode * 13 + i * 7) % 3000;
+      // Simple direct mapping - just add the char code to base
+      const chineseCharCode = baseCharCode + (charCode - 32); // Shift printable ASCII range (32-126) to Chinese range
       result += String.fromCharCode(chineseCharCode);
     }
     
@@ -1203,22 +1283,30 @@ class DiscordCryptochat {
   }
 
   chineseToBase64(chineseText) {
-    // Convert Chinese characters back to base64
+    // Convert Chinese characters back to base64 using simple, reversible mapping
     let result = '';
     const baseCharCode = 0x4E00;
     
     for (let i = 0; i < chineseText.length; i++) {
       const chineseCharCode = chineseText.charCodeAt(i);
-      const offset = chineseCharCode - baseCharCode;
       
-      // Reverse the mapping
-      let originalCharCode = 33; // Start searching from '!'
-      for (let j = 33; j <= 126; j++) {
-        if ((j * 13 + i * 7) % 3000 === offset) {
-          originalCharCode = j;
-          break;
-        }
-      }
+             // Check if it's in our expected range
+       if (chineseCharCode < baseCharCode || chineseCharCode > baseCharCode + 94) {
+         // console.warn('🔐 [DECODE] Character out of expected range:', chineseCharCode, 'at position', i);
+         // Try to handle gracefully
+         result += '?';
+         continue;
+       }
+       
+       // Simple reverse mapping
+       const originalCharCode = (chineseCharCode - baseCharCode) + 32;
+       
+       // Validate the result is in printable ASCII range
+       if (originalCharCode < 32 || originalCharCode > 126) {
+         // console.warn('🔐 [DECODE] Invalid ASCII char code:', originalCharCode);
+         result += '?';
+         continue;
+       }
       
       result += String.fromCharCode(originalCharCode);
     }
@@ -1247,15 +1335,240 @@ class DiscordCryptochat {
     const ratio = chineseCount / textWithoutSpaces.length;
     const isEncrypted = ratio > 0.7;
     
-    console.log('🔐 [CRYPTO] 🔍 Checking if encrypted:', {
-      textLength: text.length,
-      cleanLength: textWithoutSpaces.length,
-      chineseCount: chineseCount,
-      ratio: ratio.toFixed(2),
-      isEncrypted: isEncrypted
-    });
+    // console.log('🔐 [CRYPTO] 🔍 Checking if encrypted:', {
+    //   textLength: text.length,
+    //   cleanLength: textWithoutSpaces.length,
+    //   chineseCount: chineseCount,
+    //   ratio: ratio.toFixed(2),
+    //   isEncrypted: isEncrypted
+    // });
     
     return isEncrypted;
+  }
+
+  // ========== NEW HANDLER METHODS FOR OPTIONS PAGE ==========
+
+  async handleGetCurrentKeyInfo(sendResponse) {
+    try {
+      console.log('🔐 [HANDLER] Getting current key info...');
+      
+      if (!window.ecCrypto) {
+        console.log('🔐 [HANDLER] ❌ EC crypto not available');
+        sendResponse({ success: false, error: 'EC crypto not available' });
+        return;
+      }
+
+      // Get key information from ECCrypto - try multiple ways to get the public key
+      let publicKey = null;
+      
+      // Try to get public key from the ECCrypto instance
+      if (window.ecCrypto.staticPublicKey) {
+        publicKey = await window.ecCrypto.exportPublicKey(window.ecCrypto.staticPublicKey);
+      } else {
+        // Try to get from storage if not in memory
+        const stored = await chrome.storage.local.get(['ecStaticPublicKey']);
+        if (stored.ecStaticPublicKey) {
+          publicKey = stored.ecStaticPublicKey;
+        }
+      }
+      
+      const keyInfo = {
+        keyId: window.ecCrypto.myKeyId || 'Unknown',
+        publicKey: publicKey || 'Loading...',
+        created: null,
+        nextRotation: null
+      };
+
+      // Try to get stored key generation timestamp
+      try {
+        const stored = await chrome.storage.local.get(['ecKeyGenerated', 'ecRotationInterval', 'ecLastRotation']);
+        
+        if (stored.ecKeyGenerated) {
+          keyInfo.created = stored.ecKeyGenerated;
+        }
+        
+        // Calculate next rotation if applicable
+        if (stored.ecRotationInterval && stored.ecLastRotation) {
+          keyInfo.nextRotation = stored.ecLastRotation + stored.ecRotationInterval;
+        } else if (stored.ecRotationInterval && stored.ecKeyGenerated) {
+          keyInfo.nextRotation = stored.ecKeyGenerated + stored.ecRotationInterval;
+        }
+        
+      } catch (storageError) {
+        console.log('🔐 [HANDLER] ⚠️ Could not get storage info:', storageError);
+      }
+      
+      console.log('🔐 [HANDLER] ✅ Key info retrieved:', {
+        keyId: keyInfo.keyId,
+        publicKeyLength: keyInfo.publicKey ? keyInfo.publicKey.length : 0,
+        created: keyInfo.created ? new Date(keyInfo.created).toLocaleString() : 'Unknown',
+        nextRotation: keyInfo.nextRotation ? new Date(keyInfo.nextRotation).toLocaleString() : 'N/A'
+      });
+      
+      sendResponse({
+        success: true,
+        keyInfo: keyInfo
+      });
+    } catch (error) {
+      console.error('🔐 [HANDLER] ❌ Failed to get current key info:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  async handleGetContactList(sendResponse) {
+    try {
+      if (!window.ecCrypto) {
+        sendResponse([]);
+        return;
+      }
+
+      const contacts = await window.ecCrypto.getContactList();
+      sendResponse(contacts);
+    } catch (error) {
+      console.error('Failed to get contact list:', error);
+      sendResponse([]);
+    }
+  }
+
+  async handleClearAllContacts(sendResponse) {
+    try {
+      if (!window.ecCrypto) {
+        sendResponse({ success: false, error: 'EC crypto not available' });
+        return;
+      }
+
+      await window.ecCrypto.clearAllContacts();
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Failed to clear contacts:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  async handleTestEncryption(message, sendResponse) {
+    try {
+      let result = { success: false };
+
+      // Try asymmetric encryption first
+      if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+        try {
+          const asymmetricResult = await this.encryptAsymmetricMessage(message);
+          if (asymmetricResult && asymmetricResult.success) {
+            result = {
+              success: true,
+              encryptedText: asymmetricResult.encryptedText,
+              method: 'asymmetric',
+              recipientInfo: asymmetricResult.details?.recipientUserId || 'contact key'
+            };
+          }
+        } catch (asymmetricError) {
+          // Fall back to symmetric
+        }
+      }
+
+      // Fallback to symmetric encryption
+      if (!result.success && this.encryptionKey) {
+        try {
+          const encryptedMessage = await discordCrypto.encrypt(message, this.encryptionKey);
+          const finalMessage = this.encodeStealthMessage(encryptedMessage);
+          
+          result = {
+            success: true,
+            encryptedText: finalMessage,
+            method: 'symmetric',
+            recipientInfo: 'shared key'
+          };
+        } catch (symmetricError) {
+          result.error = symmetricError.message;
+        }
+      }
+
+      if (!result.success && !result.error) {
+        result.error = 'No encryption method available';
+      }
+
+      sendResponse(result);
+    } catch (error) {
+      console.error('Failed to test encryption:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  async handleTestDecryption(encryptedText, sendResponse) {
+    try {
+      let result = { success: false };
+
+      // Try asymmetric decryption first
+      if (this.processAsymmetricMessage && typeof this.processAsymmetricMessage === 'function') {
+        try {
+          const asymmetricResult = await this.processAsymmetricMessage(encryptedText, null);
+          if (asymmetricResult && asymmetricResult.success) {
+            result = {
+              success: true,
+              decryptedText: asymmetricResult.decryptedText,
+              method: 'asymmetric'
+            };
+          }
+        } catch (asymmetricError) {
+          // Fall back to symmetric
+        }
+      }
+
+      // Fallback to symmetric decryption
+      if (!result.success && this.encryptionKey) {
+        try {
+          const encryptedPayload = this.decodeStealthMessage(encryptedText);
+          const decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
+          
+          result = {
+            success: true,
+            decryptedText: decryptedMessage,
+            method: 'symmetric'
+          };
+        } catch (symmetricError) {
+          result.error = symmetricError.message;
+        }
+      }
+
+      if (!result.success && !result.error) {
+        result.error = 'Cannot decrypt - missing keys or invalid format';
+      }
+
+      sendResponse(result);
+    } catch (error) {
+      console.error('Failed to test decryption:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  async handleUpdateECRotationInterval(intervalMs, sendResponse) {
+    try {
+      if (!window.ecCrypto) {
+        sendResponse({ success: false, error: 'EC crypto not available' });
+        return;
+      }
+
+      await window.ecCrypto.updateRotationInterval(intervalMs);
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Failed to update EC rotation interval:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  async handleRotateKeys(sendResponse) {
+    try {
+      if (!window.ecCrypto) {
+        sendResponse({ success: false, error: 'EC crypto not available' });
+        return;
+      }
+
+      await window.ecCrypto.rotateKeysNow();
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Failed to rotate keys:', error);
+      sendResponse({ success: false, error: error.message });
+    }
   }
 }
 
@@ -1283,4 +1596,142 @@ window.forceAsymmetricInit = function() {
   } else {
     console.log('🔐 [MANUAL] ❌ initAsymmetricEncryption not available');
   }
+};
+
+// Global debug function to check key status after rotation
+window.debugKeyStatus = function() {
+  console.log('🔐 [DEBUG] === KEY STATUS DEBUG ===');
+  
+  if (window.ecCrypto) {
+    const myUser = window.ecCrypto.getCurrentUser();
+    console.log('🔐 [DEBUG] My User Info:', myUser);
+    
+    // Check stored key info
+    chrome.storage.local.get([
+      'ecStaticPrivateKey', 
+      'ecStaticPublicKey', 
+      'ecMyKeyId',
+      'ecKeyGenerated',
+      'ecKeyEntropy',
+      'ecLastRotation',
+      'ecRotationCount'
+    ]).then(stored => {
+      console.log('🔐 [DEBUG] Stored Key Info:');
+      console.log('🔐 [DEBUG]   Key ID:', stored.ecMyKeyId);
+      console.log('🔐 [DEBUG]   Generated:', stored.ecKeyGenerated ? new Date(stored.ecKeyGenerated).toLocaleString() : 'Unknown');
+      console.log('🔐 [DEBUG]   Last Rotation:', stored.ecLastRotation ? new Date(stored.ecLastRotation).toLocaleString() : 'Never');
+      console.log('🔐 [DEBUG]   Rotation Count:', stored.ecRotationCount || 0);
+      console.log('🔐 [DEBUG]   Entropy Sample:', stored.ecKeyEntropy ? stored.ecKeyEntropy.substring(0, 50) + '...' : 'None');
+      
+      if (stored.ecStaticPublicKey) {
+        console.log('🔐 [DEBUG]   Public Key Sample:', stored.ecStaticPublicKey.substring(0, 50) + '...');
+      }
+    });
+    
+    const contacts = Array.from(window.ecCrypto.userKeys.entries());
+    console.log('🔐 [DEBUG] Contact Count:', contacts.length);
+    
+    contacts.forEach(([userId, userInfo]) => {
+      console.log(`🔐 [DEBUG] Contact: ${userInfo.username} (${userId})`);
+      console.log(`🔐 [DEBUG]   Key ID: ${userInfo.keyId}`);
+      console.log(`🔐 [DEBUG]   Last Seen: ${new Date(userInfo.lastSeen).toLocaleTimeString()}`);
+      if (userInfo.rotatedAt) {
+        console.log(`🔐 [DEBUG]   Rotated: ${new Date(userInfo.rotatedAt).toLocaleTimeString()}`);
+        console.log(`🔐 [DEBUG]   Previous Key: ${userInfo.previousKeyId}`);
+      }
+    });
+  } else {
+    console.log('🔐 [DEBUG] ECCrypto not available');
+  }
+  
+  console.log('🔐 [DEBUG] ========================');
+};
+
+// Force regenerate unique keys
+window.forceUniqueKeys = async function() {
+  console.log('🔐 [FORCE] === FORCING UNIQUE KEY GENERATION ===');
+  
+  if (!window.ecCrypto) {
+    console.log('🔐 [FORCE] ECCrypto not available');
+    return;
+  }
+  
+  try {
+    // Clear all storage first
+    await chrome.storage.local.remove([
+      'ecStaticPrivateKey', 
+      'ecStaticPublicKey', 
+      'ecMyKeyId',
+      'ecKeyGenerated',
+      'ecKeyEntropy',
+      'ecEntropyComponents'
+    ]);
+    
+    console.log('🔐 [FORCE] Cleared all stored keys');
+    
+    // Clear in-memory keys
+    window.ecCrypto.staticPrivateKey = null;
+    window.ecCrypto.staticPublicKey = null;
+    window.ecCrypto.myKeyId = null;
+    
+    console.log('🔐 [FORCE] Cleared in-memory keys');
+    
+    // Force regeneration with unique timestamp and extra entropy
+    const uniqueTimestamp = Date.now();
+    const extraEntropy = crypto.getRandomValues(new Uint8Array(64));
+    const userAgent = navigator.userAgent;
+    const screenInfo = `${screen.width}x${screen.height}x${screen.colorDepth}`;
+    
+    console.log('🔐 [FORCE] Unique Timestamp:', uniqueTimestamp);
+    console.log('🔐 [FORCE] Extra Entropy:', Array.from(extraEntropy.slice(0, 8)).join(','), '...');
+    console.log('🔐 [FORCE] Screen Info:', screenInfo);
+    
+    // Wait a moment to ensure timestamp differences
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
+    // Generate completely new keypair
+    await window.ecCrypto.generateStaticKeypair();
+    
+    console.log('🔐 [FORCE] New keypair generated!');
+    console.log('🔐 [FORCE] New Key ID:', window.ecCrypto.myKeyId);
+    
+    // Reload to ensure consistency
+    await window.ecCrypto.loadOrGenerateStaticKeypair();
+    
+    console.log('🔐 [FORCE] Reloaded and verified');
+    console.log('🔐 [FORCE] Final Key ID:', window.ecCrypto.myKeyId);
+    
+  } catch (error) {
+    console.error('🔐 [FORCE] Error during force regeneration:', error);
+  }
+  
+  console.log('🔐 [FORCE] =======================================');
+};
+
+// Quick fix after key rotation
+window.fixAfterRotation = async function() {
+  console.log('🔐 [FIX] === FIXING COMMUNICATION AFTER ROTATION ===');
+  
+  if (!window.ecCrypto) {
+    console.log('🔐 [FIX] ECCrypto not available');
+    return;
+  }
+  
+  try {
+    // Clear all contacts first
+    await window.ecCrypto.clearAllContacts();
+    console.log('🔐 [FIX] ✅ Cleared all contacts');
+    
+    // Force key reload
+    await window.ecCrypto.loadOrGenerateStaticKeypair();
+    console.log('🔐 [FIX] ✅ Reloaded keys');
+    
+    console.log('🔐 [FIX] ✅ Ready for new contact discovery');
+    console.log('🔐 [FIX] 💡 Send a test message to rediscover contacts');
+    
+  } catch (error) {
+    console.error('🔐 [FIX] Error during fix:', error);
+  }
+  
+  console.log('🔐 [FIX] ==============================');
 }; 

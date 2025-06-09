@@ -149,8 +149,42 @@ class OptionsManager {
       await this.rotateKeysManually();
     });
 
-    this.viewContactsButton.addEventListener('click', () => {
-      this.toggleContactList();
+    this.viewContactsButton.addEventListener('click', async () => {
+      await this.refreshContactsList();
+    });
+
+    // New asymmetric features
+    document.getElementById('export-public-key')?.addEventListener('click', async () => {
+      await this.exportPublicKey();
+    });
+
+    document.getElementById('clear-all-contacts')?.addEventListener('click', async () => {
+      await this.clearAllContacts();
+    });
+
+    document.getElementById('test-encrypt')?.addEventListener('click', async () => {
+      await this.testAsymmetricEncryption();
+    });
+
+    document.getElementById('test-decrypt')?.addEventListener('click', async () => {
+      await this.testAsymmetricDecryption();
+    });
+
+    // Debug button event listeners
+    document.getElementById('debug-key-status')?.addEventListener('click', async () => {
+      await this.debugKeyStatus();
+    });
+
+    document.getElementById('force-unique-keys')?.addEventListener('click', async () => {
+      await this.forceUniqueKeys();
+    });
+
+    document.getElementById('fix-after-rotation')?.addEventListener('click', async () => {
+      await this.fixAfterRotation();
+    });
+
+    document.getElementById('cleanup-temp-contacts')?.addEventListener('click', async () => {
+      await this.cleanupTempContacts();
     });
   }
 
@@ -939,6 +973,11 @@ class OptionsManager {
     
     if (isEnabled) {
       this.enableAsymmetricMode();
+      // Load current key info and contacts
+      setTimeout(() => {
+        this.updateCurrentKeyInfo();
+        this.refreshContactsList();
+      }, 1000);
     } else {
       this.disableAsymmetricMode();
     }
@@ -1169,6 +1208,537 @@ class OptionsManager {
     if (hours > 0) return `${hours}h ${minutes % 60}m`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
+  }
+
+  // ========== NEW ENHANCED ASYMMETRIC METHODS ==========
+
+  async refreshContactsList() {
+    try {
+      this.viewContactsButton.textContent = '🔄 Loading...';
+      this.viewContactsButton.disabled = true;
+
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getContactList' });
+          
+          if (response && Array.isArray(response)) {
+            this.displayContactsInNewFormat(response);
+            document.getElementById('contact-count').textContent = response.length;
+            break;
+          }
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+      // Also update the key info
+      await this.updateCurrentKeyInfo();
+      
+    } catch (error) {
+      console.error('Failed to refresh contacts:', error);
+      document.getElementById('contact-list-content').innerHTML = '<div style="color: #dc3545; text-align: center; padding: 20px;">Error loading contacts</div>';
+    } finally {
+      this.viewContactsButton.textContent = '🔄 Refresh';
+      this.viewContactsButton.disabled = false;
+    }
+  }
+
+  displayContactsInNewFormat(contacts) {
+    const content = document.getElementById('contact-list-content');
+    
+    if (contacts.length === 0) {
+      content.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No contacts discovered yet. Send an encrypted message to discover contacts automatically.</div>';
+      return;
+    }
+    
+    let html = '';
+    contacts.forEach((contact, index) => {
+      const discoveredDate = contact.discoveredAt ? new Date(contact.discoveredAt).toLocaleDateString() : 'Unknown';
+      
+      html += `<div style="margin-bottom: 8px; padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #007bff;">`;
+      html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">`;
+      html += `<div style="font-weight: 600; color: #333; font-size: 12px;">👤 ${contact.username || 'Unknown User'}</div>`;
+      html += `<div style="font-size: 10px; color: #28a745; background: #e8f5e8; padding: 2px 6px; border-radius: 10px;">Contact ${index + 1}</div>`;
+      html += `</div>`;
+      
+      if (contact.discordUserId) {
+        html += `<div style="font-size: 10px; color: #666; margin-bottom: 2px;">🎮 Discord ID: ${contact.discordUserId}</div>`;
+      }
+      
+      html += `<div style="font-size: 10px; color: #666; margin-bottom: 2px;">🔑 Key ID: ${contact.keyId}</div>`;
+      html += `<div style="font-size: 10px; color: #999;">📅 Discovered: ${discoveredDate}</div>`;
+      html += `</div>`;
+    });
+    
+    content.innerHTML = html;
+  }
+
+  async updateCurrentKeyInfo() {
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getCurrentKeyInfo' });
+          
+          if (response && response.success) {
+            const keyInfo = response.keyInfo;
+            
+            // Update key ID
+            document.getElementById('current-key-id').textContent = keyInfo.keyId || 'Loading...';
+            
+            // Update public key
+            document.getElementById('my-public-key').value = keyInfo.publicKey || 'Loading...';
+            
+            // Update key created time
+            if (keyInfo.created) {
+              document.getElementById('key-created').textContent = new Date(keyInfo.created).toLocaleString();
+            } else {
+              document.getElementById('key-created').textContent = 'Unknown';
+            }
+            
+            // Update next rotation
+            if (keyInfo.nextRotation) {
+              const timeUntil = keyInfo.nextRotation - Date.now();
+              if (timeUntil > 0) {
+                document.getElementById('next-rotation').textContent = this.formatTime(timeUntil);
+              } else {
+                document.getElementById('next-rotation').textContent = 'Due for rotation';
+              }
+            } else {
+              document.getElementById('next-rotation').textContent = 'Manual only';
+            }
+            
+            break;
+          }
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to update current key info:', error);
+    }
+  }
+
+  async exportPublicKey() {
+    try {
+      const publicKey = document.getElementById('my-public-key').value;
+      
+      if (!publicKey || publicKey === 'Loading...') {
+        this.showStatus('No public key available to export', 'error');
+        return;
+      }
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(publicKey);
+      this.showStatus('Public key copied to clipboard!', 'success');
+      
+      // Temporarily change button text
+      const button = document.getElementById('export-public-key');
+      const originalText = button.textContent;
+      button.textContent = '✅ Copied!';
+      setTimeout(() => {
+        button.textContent = originalText;
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Failed to export public key:', error);
+      this.showStatus('Failed to copy public key', 'error');
+    }
+  }
+
+  async clearAllContacts() {
+    const confirmed = confirm('Are you sure you want to clear all discovered contacts? This action cannot be undone.');
+    
+    if (!confirmed) return;
+    
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, { action: 'clearAllContacts' });
+          break; // Only need one successful clear
+        } catch (error) {
+          // Try next tab
+        }
+      }
+      
+      // Refresh the display
+      await this.refreshContactsList();
+      this.showStatus('All contacts cleared successfully', 'success');
+      
+    } catch (error) {
+      console.error('Failed to clear contacts:', error);
+      this.showStatus('Failed to clear contacts', 'error');
+    }
+  }
+
+  async testAsymmetricEncryption() {
+    try {
+      const message = document.getElementById('demo-message').value.trim();
+      
+      if (!message) {
+        this.showStatus('Please enter a test message', 'error');
+        return;
+      }
+      
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { 
+            action: 'testEncryption',
+            message: message
+          });
+          
+          if (response && response.success) {
+            document.getElementById('encrypted-result').value = response.encryptedText;
+            this.showStatus(`Encryption successful! Used ${response.method} with ${response.recipientInfo || 'static key'}`, 'success');
+            break;
+          } else {
+            document.getElementById('encrypted-result').value = 'Encryption failed: ' + (response.error || 'Unknown error');
+          }
+        } catch (error) {
+          document.getElementById('encrypted-result').value = 'Error: ' + error.message;
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to test encryption:', error);
+      document.getElementById('encrypted-result').value = 'Error: ' + error.message;
+    }
+  }
+
+  async testAsymmetricDecryption() {
+    try {
+      const encryptedText = document.getElementById('encrypted-result').value.trim();
+      
+      if (!encryptedText || encryptedText.startsWith('Encryption failed') || encryptedText.startsWith('Error:')) {
+        this.showStatus('Please encrypt a message first', 'error');
+        return;
+      }
+      
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      for (const tab of tabs) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { 
+            action: 'testDecryption',
+            encryptedText: encryptedText
+          });
+          
+          if (response && response.success) {
+            document.getElementById('decrypted-result').value = response.decryptedText;
+            this.showStatus(`Decryption successful! Used ${response.method}`, 'success');
+            break;
+          } else {
+            document.getElementById('decrypted-result').value = 'Decryption failed: ' + (response.error || 'Cannot decrypt without proper keys');
+            this.showStatus('Decryption failed - this demonstrates that without the correct keys, messages cannot be decrypted', 'info');
+          }
+        } catch (error) {
+          document.getElementById('decrypted-result').value = 'Error: ' + error.message;
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to test decryption:', error);
+      document.getElementById('decrypted-result').value = 'Error: ' + error.message;
+    }
+  }
+
+  // Override the updateAsymmetricRotationInterval to handle manual mode
+  async updateAsymmetricRotationInterval() {
+    const interval = this.ecRotationIntervalSelect.value;
+    
+    try {
+      if (interval === 'manual') {
+        // Disable automatic rotation
+        await chrome.storage.local.set({
+          ecRotationInterval: null,
+          ecAutoRotation: false
+        });
+        this.showStatus('Switched to manual key rotation only', 'info');
+      } else {
+        // Enable automatic rotation with specified interval
+        const intervalMs = parseInt(interval);
+        await chrome.storage.local.set({
+          ecRotationInterval: intervalMs,
+          ecAutoRotation: true
+        });
+        this.showStatus(`Key rotation set to ${this.formatInterval(intervalMs)}`, 'success');
+        
+        // Update the EC crypto instance if available
+        const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+        const notifications = tabs.map(tab => 
+          chrome.tabs.sendMessage(tab.id, {
+            action: 'updateECRotationInterval',
+            intervalMs: intervalMs
+          }).catch(() => {})
+        );
+        
+        await Promise.all(notifications);
+      }
+      
+      // Trigger refresh of status to show new next rotation time
+      setTimeout(() => {
+        this.updateCurrentKeyInfo();
+      }, 100);
+      
+    } catch (error) {
+      console.error('Failed to update asymmetric rotation interval:', error);
+      this.showStatus('Failed to update rotation interval', 'error');
+    }
+  }
+
+  // Start auto-updating the key info display
+  startAsymmetricStatusUpdates() {
+    if (this.asymmetricStatusInterval) {
+      clearInterval(this.asymmetricStatusInterval);
+    }
+    
+    this.asymmetricStatusInterval = setInterval(() => {
+      this.updateCurrentKeyInfo();
+    }, 5000); // Update every 5 seconds
+  }
+
+  // Debug Methods
+  async debugKeyStatus() {
+    const debugLog = document.getElementById('debug-log');
+    
+    try {
+      debugLog.value = 'Running key status debug...\n\n';
+      
+      // Get the active tabs to send message to content script
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      if (tabs.length === 0) {
+        debugLog.value += 'No Discord tab found! Please open Discord.\n';
+        return;
+      }
+      
+      // Send message to content script to run debug
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'debugKeyStatus'
+        });
+        
+        debugLog.value += 'Debug command sent to Discord tab\n';
+      } catch (error) {
+        debugLog.value += 'Could not send debug command to Discord tab\n';
+      }
+      
+      debugLog.value += 'Check browser console (F12) for detailed output\n\n';
+      
+      // Also get storage info for display
+      const stored = await chrome.storage.local.get([
+        'ecStaticPrivateKey', 
+        'ecStaticPublicKey', 
+        'ecMyKeyId',
+        'ecKeyGenerated',
+        'ecLastRotation',
+        'ecRotationCount'
+      ]);
+      
+      debugLog.value += '=== STORED KEY INFO ===\n';
+      debugLog.value += `Key ID: ${stored.ecMyKeyId || 'Not set'}\n`;
+      debugLog.value += `Generated: ${stored.ecKeyGenerated ? new Date(stored.ecKeyGenerated).toLocaleString() : 'Unknown'}\n`;
+      debugLog.value += `Last Rotation: ${stored.ecLastRotation ? new Date(stored.ecLastRotation).toLocaleString() : 'Never'}\n`;
+      debugLog.value += `Rotation Count: ${stored.ecRotationCount || 0}\n`;
+      
+      if (stored.ecStaticPublicKey) {
+        debugLog.value += `Public Key: ${stored.ecStaticPublicKey.substring(0, 50)}...\n`;
+      }
+      
+      debugLog.value += '\n✅ Debug complete! Check console for full details.\n';
+      
+    } catch (error) {
+      debugLog.value += `❌ Debug failed: ${error.message}\n`;
+      console.error('Debug key status error:', error);
+    }
+  }
+
+  async forceUniqueKeys() {
+    const debugLog = document.getElementById('debug-log');
+    
+    try {
+      debugLog.value = 'Forcing unique key regeneration...\n\n';
+      
+      // Get the active tabs to send message to content script
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      if (tabs.length === 0) {
+        debugLog.value += 'No Discord tab found! Please open Discord.\n';
+        return;
+      }
+      
+      debugLog.value += 'Step 1: Clearing stored keys...\n';
+      
+      // Clear all stored EC keys
+      await chrome.storage.local.remove([
+        'ecStaticPrivateKey', 
+        'ecStaticPublicKey', 
+        'ecMyKeyId',
+        'ecKeyGenerated',
+        'ecKeyEntropy',
+        'ecEntropyComponents'
+      ]);
+      
+      debugLog.value += 'Step 2: Sending regeneration command...\n';
+      
+      // Send message to content script to regenerate
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'forceUniqueKeys'
+        });
+        debugLog.value += 'Regeneration command sent successfully\n';
+      } catch (error) {
+        debugLog.value += 'Could not send command to Discord tab\n';
+      }
+      
+      debugLog.value += 'Step 3: Waiting for regeneration...\n';
+      
+      // Wait a moment then check new keys
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const newStored = await chrome.storage.local.get(['ecMyKeyId', 'ecKeyGenerated']);
+      
+      debugLog.value += `Step 4: New Key ID: ${newStored.ecMyKeyId || 'Still generating...'}\n`;
+      debugLog.value += `Generated: ${newStored.ecKeyGenerated ? new Date(newStored.ecKeyGenerated).toLocaleString() : 'In progress...'}\n`;
+      
+      debugLog.value += '\n✅ Unique key regeneration complete!\n';
+      debugLog.value += '💡 Send a test message to verify uniqueness\n';
+      
+      // Refresh the UI
+      await this.updateCurrentKeyInfo();
+      
+    } catch (error) {
+      debugLog.value += `❌ Force unique keys failed: ${error.message}\n`;
+      console.error('Force unique keys error:', error);
+    }
+  }
+
+  async fixAfterRotation() {
+    const debugLog = document.getElementById('debug-log');
+    
+    try {
+      debugLog.value = 'Fixing communication after rotation...\n\n';
+      
+      // Get the active tabs to send message to content script
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      if (tabs.length === 0) {
+        debugLog.value += 'No Discord tab found! Please open Discord.\n';
+        return;
+      }
+      
+      debugLog.value += 'Step 1: Clearing all contacts...\n';
+      
+      // Clear contacts via content script
+      try {
+        const clearResponse = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'clearAllContacts'
+        });
+        
+        if (clearResponse && clearResponse.success) {
+          debugLog.value += '✅ Contacts cleared successfully\n';
+        } else {
+          debugLog.value += '⚠️ Contact clearing may have failed\n';
+        }
+      } catch (error) {
+        debugLog.value += '❌ Could not clear contacts via Discord tab\n';
+      }
+      
+      debugLog.value += 'Step 2: Reloading keys...\n';
+      
+      // Send fix command to content script
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'fixAfterRotation'
+        });
+        debugLog.value += 'Fix command sent successfully\n';
+      } catch (error) {
+        debugLog.value += 'Could not send fix command to Discord tab\n';
+      }
+      
+      debugLog.value += 'Step 3: Refreshing UI...\n';
+      
+      // Refresh contact list and key info
+      await this.refreshContactsList();
+      await this.updateCurrentKeyInfo();
+      
+      debugLog.value += '\n✅ Fix complete!\n';
+      debugLog.value += '💡 Now send a test message to rediscover contacts\n';
+      debugLog.value += '🔄 Both users should do this after key rotation\n';
+      
+    } catch (error) {
+      debugLog.value += `❌ Fix after rotation failed: ${error.message}\n`;
+      console.error('Fix after rotation error:', error);
+    }
+  }
+
+  async cleanupTempContacts() {
+    const debugLog = document.getElementById('debug-log');
+    
+    try {
+      debugLog.value = 'Cleaning up temporary contacts...\n\n';
+      
+      // Get the active tabs to send message to content script
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      if (tabs.length === 0) {
+        debugLog.value += 'No Discord tab found! Please open Discord.\n';
+        return;
+      }
+      
+      debugLog.value += 'Step 1: Getting current contact list...\n';
+      
+      // Get current contacts first
+      const currentContacts = await this.refreshContactsList();
+      const tempContacts = currentContacts.filter(contact => 
+        contact.id && contact.id.startsWith('temp_'));
+      
+      debugLog.value += `Found ${tempContacts.length} temporary contacts\n`;
+      
+      if (tempContacts.length === 0) {
+        debugLog.value += '✅ No temporary contacts to clean up!\n';
+        return;
+      }
+      
+      // Show which temp contacts we found
+      tempContacts.forEach(contact => {
+        debugLog.value += `📋 Temp: ${contact.id} (${contact.username})\n`;
+      });
+      
+      debugLog.value += '\nStep 2: Calling cleanup function...\n';
+      
+      // Call cleanup via content script
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'cleanupTempContacts'
+        });
+        
+        if (response && response.success) {
+          debugLog.value += `✅ Cleanup successful! Removed ${response.removedCount || 0} contacts\n`;
+        } else {
+          debugLog.value += '⚠️ Cleanup may have failed\n';
+        }
+      } catch (error) {
+        debugLog.value += '❌ Could not send cleanup command to Discord tab\n';
+      }
+      
+      debugLog.value += '\nStep 3: Refreshing contact list...\n';
+      
+      // Refresh contact list to show results
+      await this.refreshContactsList();
+      
+      debugLog.value += '\n✅ Cleanup complete!\n';
+      debugLog.value += '💡 Temp contacts are created when user IDs cannot be extracted\n';
+      debugLog.value += '💡 If this keeps happening, the user ID extraction needs fixing\n';
+      
+    } catch (error) {
+      debugLog.value += `❌ Cleanup temp contacts failed: ${error.message}\n`;
+      console.error('Cleanup temp contacts error:', error);
+    }
   }
 }
 
