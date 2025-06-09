@@ -462,18 +462,23 @@ class DiscordCryptochat {
       return; // Extension is disabled
     }
     
-    // Get message text - try multiple methods for Discord's Slate editor
+    // Get message text with proper emoji handling
     let messageText = '';
     
-    // Method 1: Try textContent
-    messageText = messageBox.textContent?.trim() || '';
+    // Method 1: Try to extract rich content including emojis
+    messageText = this.extractRichMessageContent(messageBox);
     
-    // Method 2: Try innerText if textContent is empty
+    // Method 2: Fallback to textContent
+    if (!messageText) {
+      messageText = messageBox.textContent?.trim() || '';
+    }
+    
+    // Method 3: Fallback to innerText
     if (!messageText) {
       messageText = messageBox.innerText?.trim() || '';
     }
     
-    // Method 3: Look for slate string elements
+    // Method 4: Look for slate string elements
     if (!messageText) {
       const slateStrings = messageBox.querySelectorAll('[data-slate-string="true"]');
       if (slateStrings.length > 0) {
@@ -888,24 +893,18 @@ class DiscordCryptochat {
         try {
           // Decode the stealth message to get base64
           const encryptedPayload = this.decodeStealthMessage(messageText);
-          // console.log('🔐 [DECRYPT] Decoded payload length:', encryptedPayload.length);
-          
           // Decrypt the message using symmetric encryption
           decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
           decryptionMethod = 'symmetric';
           decryptionDetails = { keyType: 'shared_secret' };
-          // console.log('🔐 [DECRYPT] ✅ Symmetric decryption SUCCESS!');
-          // console.log('🔐 [DECRYPT] Decrypted:', decryptedMessage);
         } catch (symmetricError) {
-          // console.log('🔐 [DECRYPT] ❌ Symmetric decryption failed:', symmetricError.message);
+          // Symmetric decryption failed, will try asymmetric
         }
-      } else if (!this.encryptionKey) {
-        // console.log('🔐 [DECRYPT] ⚠️ No symmetric encryption key available');
       }
       
       if (decryptedMessage) {
-        // Replace the message content
-        messageContent.textContent = decryptedMessage;
+        // Enhanced message rendering with emoji, GIF, and link support
+        await this.renderDecryptedMessage(messageContent, decryptedMessage);
         
         // Add visual indicator with method info
         this.addDecryptionIndicator(messageContent, decryptionMethod);
@@ -929,6 +928,830 @@ class DiscordCryptochat {
       
       return { processed: true, decrypted: false, skipped: false };
     }
+  }
+
+  async renderDecryptedMessage(messageContent, decryptedText) {
+    // 🎨 Enhanced message rendering with emoji, GIF, and link support
+    try {
+      // Clear existing content
+      messageContent.innerHTML = '';
+      
+      // Process the decrypted text for various Discord elements
+      let processedText = decryptedText;
+      
+      // The text should already contain proper emojis from encryption
+      // Process URLs and create proper elements (async now)
+      const messageElements = await this.processLinksAndGifs(processedText);
+      
+      // Add all processed elements to the message container
+      messageElements.forEach(element => {
+        messageContent.appendChild(element);
+      });
+      
+      // Apply Discord message styling
+      messageContent.style.whiteSpace = 'pre-wrap';
+      messageContent.style.wordWrap = 'break-word';
+      
+    } catch (error) {
+      console.error('🎨 Message rendering failed, falling back to plain text:', error);
+      messageContent.textContent = decryptedText;
+    }
+  }
+
+
+
+  async processLinksAndGifs(text) {
+    const elements = [];
+    const parts = text.split(/(\s+)/); // Split by whitespace but keep the whitespace
+    
+    for (const part of parts) {
+      if (this.isUrl(part)) {
+        if (this.isDirectImageUrl(part)) {
+          // Direct image URL - embed immediately
+          const mediaContainer = this.createDirectImageEmbed(part);
+          elements.push(mediaContainer);
+        } else if (this.isSocialMediaUrl(part)) {
+          // Social media URL - fetch metadata and create rich embed
+          const richEmbed = await this.createRichMediaEmbed(part);
+          elements.push(richEmbed);
+        } else {
+          // Regular link
+          elements.push(this.createLink(part));
+        }
+      } else {
+        // Regular text
+        const textNode = document.createTextNode(part);
+        elements.push(textNode);
+      }
+    }
+    
+    return elements;
+  }
+
+  createDirectImageEmbed(url) {
+    const container = document.createElement('div');
+    container.style.cssText = `
+      margin: 8px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #2f3136;
+      border: 1px solid #40444b;
+      max-width: 400px;
+    `;
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = `
+      width: 100%;
+      height: auto;
+      max-width: 400px;
+      max-height: 300px;
+      display: block;
+      cursor: pointer;
+      object-fit: contain;
+    `;
+    
+    img.addEventListener('click', () => {
+      window.open(url, '_blank');
+    });
+    
+    img.onerror = () => {
+      // If image fails to load, show as link instead
+      const link = this.createLink(url);
+      container.innerHTML = '';
+      container.appendChild(link);
+      container.style.padding = '8px';
+    };
+    
+    container.appendChild(img);
+    return container;
+  }
+
+  async createRichMediaEmbed(url) {
+    // Create loading placeholder
+    const container = document.createElement('div');
+    container.style.cssText = `
+      margin: 8px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #2f3136;
+      border: 1px solid #40444b;
+      max-width: 400px;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    `;
+
+    // Show loading indicator
+    container.innerHTML = `
+      <div style="color: #dcddde; font-size: 14px; padding: 20px;">
+        🔄 Loading media...
+      </div>
+    `;
+
+    // Fetch metadata in background
+    this.fetchUrlMetadata(url).then(metadata => {
+      if (metadata && (metadata.image || metadata.video)) {
+        this.renderRichEmbed(container, url, metadata);
+      } else {
+        // Fallback to link
+        container.innerHTML = '';
+        container.style.padding = '8px';
+        container.appendChild(this.createLink(url));
+      }
+    }).catch(error => {
+      console.error('Failed to fetch URL metadata:', error);
+      // Fallback to link
+      container.innerHTML = '';
+      container.style.padding = '8px';
+      container.appendChild(this.createLink(url));
+    });
+
+    return container;
+  }
+
+  async fetchUrlMetadata(url) {
+    try {
+      // Use a CORS proxy to fetch the URL content
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        timeout: 10000
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const html = await response.text();
+      return this.parseOpenGraphData(html, url);
+      
+    } catch (error) {
+      console.error('Failed to fetch URL metadata:', error);
+      
+      // Fallback: try direct URL patterns for known sites
+      return this.getKnownSiteMetadata(url);
+    }
+  }
+
+  parseOpenGraphData(html, originalUrl) {
+    try {
+      // Create a temporary DOM parser
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      const metadata = {
+        title: '',
+        description: '',
+        image: '',
+        video: '',
+        url: originalUrl,
+        siteName: ''
+      };
+
+      // Primary OpenGraph tags
+      const ogImage = doc.querySelector('meta[property="og:image"]');
+      const ogImageSecure = doc.querySelector('meta[property="og:image:secure_url"]');
+      const ogTitle = doc.querySelector('meta[property="og:title"]');
+      const ogDescription = doc.querySelector('meta[property="og:description"]');
+      const ogSiteName = doc.querySelector('meta[property="og:site_name"]');
+      const ogVideo = doc.querySelector('meta[property="og:video"]');
+      const ogVideoUrl = doc.querySelector('meta[property="og:video:url"]');
+      
+      // Twitter Card tags as fallback
+      const twitterImage = doc.querySelector('meta[name="twitter:image"]');
+      const twitterImageSrc = doc.querySelector('meta[name="twitter:image:src"]');
+      const twitterTitle = doc.querySelector('meta[name="twitter:title"]');
+      const twitterDescription = doc.querySelector('meta[name="twitter:description"]');
+      const twitterSite = doc.querySelector('meta[name="twitter:site"]');
+      
+      // Additional image sources (many news sites use these)
+      const articleImage = doc.querySelector('meta[property="article:image"]');
+      const linkIcon = doc.querySelector('link[rel="apple-touch-icon"]');
+      const favicon = doc.querySelector('link[rel="icon"]');
+      
+      // Standard meta tags as further fallback
+      const title = doc.querySelector('title');
+      const description = doc.querySelector('meta[name="description"]');
+      
+      // Try to find first actual content image if no OG image
+      let contentImage = null;
+      if (!ogImage?.content && !twitterImage?.content) {
+        const images = doc.querySelectorAll('img[src]');
+        for (const img of images) {
+          const src = img.getAttribute('src');
+          // Skip small images, icons, and ads - look for content images
+          if (src && !src.includes('icon') && !src.includes('logo') && 
+              !src.includes('pixel') && !src.includes('beacon') &&
+              !src.includes('avatar') && !src.includes('profile') &&
+              (img.getAttribute('width') > 100 || img.getAttribute('height') > 100 ||
+               (!img.getAttribute('width') && !img.getAttribute('height')))) {
+            contentImage = src;
+            break;
+          }
+        }
+      }
+      
+      // Build metadata object with comprehensive fallbacks
+      metadata.image = (
+        ogImageSecure?.content || 
+        ogImage?.content || 
+        twitterImageSrc?.content || 
+        twitterImage?.content || 
+        articleImage?.content ||
+        contentImage ||
+        linkIcon?.href ||
+        favicon?.href ||
+        ''
+      ).trim();
+      
+      metadata.title = (
+        ogTitle?.content || 
+        twitterTitle?.content || 
+        title?.textContent || 
+        ''
+      ).trim();
+      
+      metadata.description = (
+        ogDescription?.content || 
+        twitterDescription?.content || 
+        description?.content || 
+        ''
+      ).trim();
+      
+      metadata.siteName = (
+        ogSiteName?.content || 
+        (twitterSite?.content ? twitterSite.content.replace('@', '') : '') || 
+        ''
+      ).trim();
+      
+      metadata.video = (
+        ogVideoUrl?.content ||
+        ogVideo?.content || 
+        ''
+      ).trim();
+      
+      // Clean up descriptions (remove HTML entities, trim whitespace)
+      if (metadata.description) {
+        metadata.description = metadata.description
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Limit description length for display
+        if (metadata.description.length > 150) {
+          metadata.description = metadata.description.substring(0, 150) + '...';
+        }
+      }
+      
+      // Clean up titles
+      if (metadata.title) {
+        metadata.title = metadata.title
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+      
+      // Ensure we have absolute URLs for images
+      if (metadata.image && !metadata.image.startsWith('http')) {
+        try {
+          const baseUrl = originalUrl;
+          metadata.image = new URL(metadata.image, baseUrl).href;
+        } catch (e) {
+          // If URL parsing fails, leave as is
+        }
+      }
+
+      return metadata;
+      
+    } catch (error) {
+      console.error('Failed to parse OpenGraph data:', error);
+      return null;
+    }
+  }
+
+  getKnownSiteMetadata(url) {
+    // Fallback patterns for known sites when CORS fails
+    try {
+      // Tenor patterns
+      if (url.includes('tenor.com')) {
+        // Pattern 1: tenor.com/view/name-ID
+        let match = url.match(/tenor\.com\/view\/([^\/]*)-(\d+)/);
+        if (match) {
+          return {
+            title: match[1].replace(/-/g, ' '),
+            image: `https://media.tenor.com/images/${match[2]}/tenor.gif`,
+            siteName: 'Tenor',
+            url: url
+          };
+        }
+        
+        // Pattern 2: Any long number in Tenor URL
+        match = url.match(/(\d{10,})/);
+        if (match) {
+          return {
+            title: 'Tenor GIF',
+            image: `https://media.tenor.com/images/${match[1]}/tenor.gif`,
+            siteName: 'Tenor',
+            url: url
+          };
+        }
+      }
+
+      // Giphy patterns
+      if (url.includes('giphy.com')) {
+        const match = url.match(/giphy\.com\/gifs\/[^\/]*-([a-zA-Z0-9]+)$/);
+        if (match) {
+          return {
+            title: 'Giphy GIF',
+            image: `https://media.giphy.com/media/${match[1]}/giphy.gif`,
+            siteName: 'Giphy',
+            url: url
+          };
+        }
+      }
+
+      // YouTube patterns
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let videoId = '';
+        if (url.includes('youtu.be/')) {
+          videoId = url.split('youtu.be/')[1].split('?')[0];
+        } else if (url.includes('youtube.com/watch?v=')) {
+          videoId = new URL(url).searchParams.get('v');
+        }
+        
+        if (videoId) {
+          return {
+            title: 'YouTube Video',
+            image: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            siteName: 'YouTube',
+            url: url
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  renderRichEmbed(container, originalUrl, metadata) {
+    container.innerHTML = '';
+    
+    // Special handling for different site types
+    if (originalUrl.includes('tenor.com')) {
+      // Tenor: Only show the GIF, no metadata
+      this.renderTenorGif(container, originalUrl, metadata);
+    } else if (originalUrl.includes('youtube.com') || originalUrl.includes('youtu.be')) {
+      // YouTube: Show thumbnail with play button
+      this.renderYouTubeEmbed(container, originalUrl, metadata);
+    } else {
+      // Other sites: Show image + metadata (like Discord/WhatsApp)
+      this.renderGeneralEmbed(container, originalUrl, metadata);
+    }
+  }
+
+  renderTenorGif(container, originalUrl, metadata) {
+    if (metadata.image) {
+      const img = document.createElement('img');
+      img.src = metadata.image;
+      img.style.cssText = `
+        width: 100%;
+        height: auto;
+        max-width: 400px;
+        max-height: 300px;
+        display: block;
+        cursor: pointer;
+        object-fit: contain;
+        border-radius: 8px;
+      `;
+      
+      img.addEventListener('click', () => {
+        window.open(originalUrl, '_blank');
+      });
+      
+      img.onerror = () => {
+        // Fallback to simple link
+        container.innerHTML = '';
+        container.style.padding = '8px';
+        container.appendChild(this.createLink(originalUrl));
+      };
+      
+      container.appendChild(img);
+    } else {
+      // No image found, show as link
+      container.innerHTML = '';
+      container.style.padding = '8px';
+      container.appendChild(this.createLink(originalUrl));
+    }
+  }
+
+  renderYouTubeEmbed(container, originalUrl, metadata) {
+    if (metadata.image) {
+      const videoContainer = document.createElement('div');
+      videoContainer.style.cssText = `
+        position: relative;
+        cursor: pointer;
+        border-radius: 8px;
+        overflow: hidden;
+      `;
+      
+      const img = document.createElement('img');
+      img.src = metadata.image;
+      img.style.cssText = `
+        width: 100%;
+        height: auto;
+        max-width: 400px;
+        max-height: 300px;
+        display: block;
+        object-fit: contain;
+      `;
+      
+      // Add play button overlay
+      const playButton = document.createElement('div');
+      playButton.innerHTML = '▶️';
+      playButton.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 48px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 50%;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.9;
+        transition: opacity 0.3s;
+      `;
+      
+      videoContainer.addEventListener('click', () => {
+        window.open(originalUrl, '_blank');
+      });
+      
+      videoContainer.addEventListener('mouseenter', () => {
+        playButton.style.opacity = '1';
+      });
+      
+      videoContainer.addEventListener('mouseleave', () => {
+        playButton.style.opacity = '0.9';
+      });
+      
+      img.onerror = () => {
+        // Fallback to link with info
+        this.renderGeneralEmbed(container, originalUrl, metadata);
+      };
+      
+      videoContainer.appendChild(img);
+      videoContainer.appendChild(playButton);
+      container.appendChild(videoContainer);
+    } else {
+      // No thumbnail, show as general embed
+      this.renderGeneralEmbed(container, originalUrl, metadata);
+    }
+  }
+
+  renderGeneralEmbed(container, originalUrl, metadata) {
+    // For news sites, social media, etc. - show image + metadata like Discord
+    if (metadata.image) {
+      const img = document.createElement('img');
+      img.src = metadata.image;
+      img.style.cssText = `
+        width: 100%;
+        height: auto;
+        max-width: 400px;
+        max-height: 300px;
+        display: block;
+        cursor: pointer;
+        object-fit: contain;
+        border-radius: 8px 8px 0 0;
+      `;
+      
+      img.addEventListener('click', () => {
+        window.open(originalUrl, '_blank');
+      });
+      
+      img.onerror = () => {
+        // If image fails, show just the link info
+        this.renderLinkInfo(container, originalUrl, metadata);
+      };
+      
+      container.appendChild(img);
+    }
+
+    // Add metadata below image (title, description, site name)
+    if (metadata.title || metadata.description || metadata.siteName) {
+      this.renderLinkInfo(container, originalUrl, metadata);
+    }
+  }
+
+  renderLinkInfo(container, originalUrl, metadata) {
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = `
+      padding: 12px;
+      background: #36393f;
+      border-top: 1px solid #40444b;
+      cursor: pointer;
+    `;
+    
+    infoDiv.addEventListener('click', () => {
+      window.open(originalUrl, '_blank');
+    });
+
+    let infoHtml = '';
+    
+    if (metadata.siteName) {
+      infoHtml += `<div style="color: #00b0f4; font-size: 12px; font-weight: 600; margin-bottom: 4px;">${metadata.siteName}</div>`;
+    }
+    
+    if (metadata.title) {
+      infoHtml += `<div style="color: #dcddde; font-size: 16px; font-weight: 600; margin-bottom: 4px; line-height: 1.2;">${metadata.title}</div>`;
+    }
+    
+    if (metadata.description) {
+      const truncatedDesc = metadata.description.length > 120 ? 
+        metadata.description.substring(0, 120) + '...' : metadata.description;
+      infoHtml += `<div style="color: #b9bbbe; font-size: 14px; line-height: 1.3;">${truncatedDesc}</div>`;
+    }
+
+    infoDiv.innerHTML = infoHtml;
+    container.appendChild(infoDiv);
+  }
+
+  createLink(url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    
+    // Create a nicer display text
+    let displayText = url;
+    try {
+      const urlObj = new URL(url);
+      displayText = urlObj.hostname + urlObj.pathname;
+      if (displayText.length > 50) {
+        displayText = displayText.substring(0, 47) + '...';
+      }
+    } catch (e) {
+      if (url.length > 50) {
+        displayText = url.substring(0, 47) + '...';
+      }
+    }
+    
+    link.textContent = displayText;
+    link.style.cssText = `
+      color: #00aff4;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 14px;
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0, 175, 244, 0.1);
+      border: 1px solid rgba(0, 175, 244, 0.3);
+      word-break: break-all;
+    `;
+    
+    link.addEventListener('mouseenter', () => {
+      link.style.textDecoration = 'underline';
+      link.style.background = 'rgba(0, 175, 244, 0.2)';
+    });
+    
+    link.addEventListener('mouseleave', () => {
+      link.style.textDecoration = 'none';
+      link.style.background = 'rgba(0, 175, 244, 0.1)';
+    });
+    
+    return link;
+  }
+
+  isUrl(text) {
+    try {
+      new URL(text);
+      return true;
+    } catch {
+      return /^https?:\/\/\S+/.test(text);
+    }
+  }
+
+  isDirectImageUrl(url) {
+    return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+  }
+
+  isSocialMediaUrl(url) {
+    const socialDomains = [
+      'tenor.com',
+      'giphy.com',
+      'youtube.com',
+      'youtu.be',
+      'twitter.com',
+      'x.com',
+      'instagram.com',
+      'tiktok.com',
+      'imgur.com',
+      'reddit.com',
+      'twitch.tv',
+      'facebook.com',
+      'linkedin.com'
+    ];
+    
+    return socialDomains.some(domain => url.includes(domain));
+  }
+
+  extractRichMessageContent(messageBox) {
+    // Extract message content preserving emojis and other rich elements
+    try {
+      let content = '';
+      
+      // Walk through all child nodes and extract text/emojis
+      const walker = document.createTreeWalker(
+        messageBox,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: (node) => {
+            // Accept text nodes and emoji elements
+            if (node.nodeType === Node.TEXT_NODE) {
+              return NodeFilter.FILTER_ACCEPT;
+            }
+            
+            // Accept emoji images and Discord emoji elements
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.tagName === 'IMG' && (
+                node.classList.contains('emoji') || 
+                node.src?.includes('discord.com/assets') ||
+                node.src?.includes('cdn.discordapp.com')
+              )) {
+                return NodeFilter.FILTER_ACCEPT;
+              }
+              
+              // Accept Discord's custom emoji spans
+              if (node.tagName === 'SPAN' && (
+                node.classList.contains('emoji') ||
+                node.dataset?.emoji
+              )) {
+                return NodeFilter.FILTER_ACCEPT;
+              }
+            }
+            
+            return NodeFilter.FILTER_SKIP;
+          }
+        }
+      );
+      
+      let node;
+      while (node = walker.nextNode()) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          content += node.textContent;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // Handle emoji elements
+          if (node.tagName === 'IMG') {
+            // Try to get emoji from alt text or data attributes
+            const emoji = node.alt || node.dataset?.emoji || node.getAttribute('data-name');
+            if (emoji) {
+              // Convert :emoji_name: back to actual emoji if possible
+              const actualEmoji = this.convertEmojiNameToUnicode(emoji);
+              content += actualEmoji || emoji;
+            } else {
+              // Fallback to a generic emoji placeholder
+              content += '😀';
+            }
+          } else if (node.tagName === 'SPAN') {
+            // Handle Discord emoji spans
+            const emoji = node.dataset?.emoji || node.textContent;
+            content += emoji || '';
+          }
+        }
+      }
+      
+      return content.trim();
+      
+    } catch (error) {
+      console.error('🎨 Failed to extract rich message content:', error);
+      return '';
+    }
+  }
+
+  convertEmojiNameToUnicode(emojiName) {
+    // Comprehensive emoji mapping based on GitHub emoji cheat sheet
+    const emojiMap = {
+      // Smileys & Emotion
+      'grinning': '😀', 'smiley': '😃', 'smile': '😄', 'grin': '😁', 'laughing': '😆', 'satisfied': '😆',
+      'sweat_smile': '😅', 'rofl': '🤣', 'joy': '😂', 'slightly_smiling_face': '🙂', 'upside_down_face': '🙃',
+      'melting_face': '🫠', 'wink': '😉', 'blush': '😊', 'innocent': '😇', 'smiling_face_with_3_hearts': '🥰',
+      'heart_eyes': '😍', 'star_struck': '🤩', 'kissing_heart': '😘', 'kissing': '😗', 'relaxed': '☺️',
+      'kissing_closed_eyes': '😚', 'kissing_smiling_eyes': '😙', 'smiling_face_with_tear': '🥲',
+      'yum': '😋', 'stuck_out_tongue': '😛', 'stuck_out_tongue_winking_eye': '😜',
+      'zany_face': '🤪', 'stuck_out_tongue_closed_eyes': '😝', 'money_mouth_face': '🤑',
+      'hugs': '🤗', 'hand_over_mouth': '🤭', 'face_with_open_eyes_and_hand_over_mouth': '🫢',
+      'face_with_peeking_eye': '🫣', 'shushing_face': '🤫', 'thinking': '🤔', 'saluting_face': '🫡',
+      'zipper_mouth_face': '🤐', 'face_with_raised_eyebrow': '🤨', 'neutral_face': '😐',
+      'expressionless': '😑', 'no_mouth': '😶', 'dotted_line_face': '🫥', 'face_in_clouds': '😶‍🌫️',
+      'smirk': '😏', 'unamused': '😒', 'roll_eyes': '🙄', 'grimacing': '😬', 'face_exhaling': '😮‍💨',
+      'lying_face': '🤥', 'relieved': '😌', 'pensive': '😔', 'sleepy': '😪', 'drooling_face': '🤤',
+      'sleeping': '😴', 'mask': '😷', 'face_with_thermometer': '🤒', 'face_with_head_bandage': '🤕',
+      'nauseated_face': '🤢', 'vomiting_face': '🤮', 'sneezing_face': '🤧', 'hot_face': '🥵',
+      'cold_face': '🥶', 'woozy_face': '🥴', 'dizzy_face': '😵', 'face_with_spiral_eyes': '😵‍💫',
+      'exploding_head': '🤯', 'cowboy_hat_face': '🤠', 'partying_face': '🥳', 'disguised_face': '🥸',
+      'sunglasses': '😎', 'nerd_face': '🤓', 'face_with_monocle': '🧐', 'confused': '😕',
+      'face_with_diagonal_mouth': '🫤', 'worried': '😟', 'slightly_frowning_face': '🙁',
+      'frowning_face': '☹️', 'open_mouth': '😮', 'hushed': '😯', 'astonished': '😲', 'flushed': '😳',
+      'pleading_face': '🥺', 'face_holding_back_tears': '🥹', 'frowning': '😦', 'anguished': '😧',
+      'fearful': '😨', 'cold_sweat': '😰', 'disappointed_relieved': '😥', 'cry': '😢', 'sob': '😭',
+      'scream': '😱', 'confounded': '😖', 'persevere': '😣', 'disappointed': '😞', 'sweat': '😓',
+      'weary': '😩', 'tired_face': '😫', 'yawning_face': '🥱', 'triumph': '😤', 'rage': '😡',
+      'angry': '😠', 'cursing_face': '🤬', 'smiling_imp': '😈', 'imp': '👿', 'skull': '💀',
+      'skull_and_crossbones': '☠️', 'poop': '💩', 'clown_face': '🤡', 'japanese_ogre': '👹',
+      'japanese_goblin': '👺', 'ghost': '👻', 'alien': '👽', 'space_invader': '👾', 'robot': '🤖',
+
+      // People & Body
+      'wave': '👋', 'raised_back_of_hand': '🤚', 'raised_hand_with_fingers_splayed': '🖐️',
+      'hand': '✋', 'raised_hand': '✋', 'vulcan_salute': '🖖', 'rightwards_hand': '🫱',
+      'leftwards_hand': '🫲', 'palm_down_hand': '🫳', 'palm_up_hand': '🫴', 'ok_hand': '👌',
+      'pinched_fingers': '🤌', 'pinching_hand': '🤏', 'v': '✌️', 'crossed_fingers': '🤞',
+      'hand_with_index_finger_and_thumb_crossed': '🫰', 'love_you_gesture': '🤟', 'metal': '🤘',
+      'call_me_hand': '🤙', 'point_left': '👈', 'point_right': '👉', 'point_up_2': '👆',
+      'middle_finger': '🖕', 'point_down': '👇', 'point_up': '☝️', 'index_pointing_at_the_viewer': '🫵',
+      'thumbsup': '👍', '+1': '👍', 'thumbsdown': '👎', '-1': '👎', 'fist': '✊',
+      'facepunch': '👊', 'punch': '👊', 'fist_oncoming': '👊', 'fist_left': '🤛', 'fist_right': '🤜',
+      'clap': '👏', 'raised_hands': '🙌', 'heart_hands': '🫶', 'open_hands': '👐',
+      'palms_up_together': '🤲', 'handshake': '🤝', 'pray': '🙏', 'writing_hand': '✍️',
+      'nail_care': '💅', 'selfie': '🤳', 'muscle': '💪', 'mechanical_arm': '🦾', 'mechanical_leg': '🦿',
+      'leg': '🦵', 'foot': '🦶', 'ear': '👂', 'ear_with_hearing_aid': '🦻', 'nose': '👃',
+      'brain': '🧠', 'anatomical_heart': '🫀', 'lungs': '🫁', 'tooth': '🦷', 'bone': '🦴',
+      'eyes': '👀', 'eye': '👁️', 'tongue': '👅', 'lips': '👄',
+
+      // Animals & Nature
+      'dog': '🐶', 'cat': '🐱', 'mouse': '🐭', 'hamster': '🐹', 'rabbit': '🐰', 'fox_face': '🦊',
+      'bear': '🐻', 'panda_face': '🐼', 'polar_bear': '🐻‍❄️', 'koala': '🐨', 'tiger': '🐯',
+      'lion': '🦁', 'cow': '🐮', 'pig': '🐷', 'pig_nose': '🐽', 'frog': '🐸', 'monkey_face': '🐵',
+      'see_no_evil': '🙈', 'hear_no_evil': '🙉', 'speak_no_evil': '🙊', 'monkey': '🐒',
+      'chicken': '🐔', 'penguin': '🐧', 'bird': '🐦', 'baby_chick': '🐤', 'hatching_chick': '🐣',
+      'hatched_chick': '🐥', 'duck': '🦆', 'eagle': '🦅', 'owl': '🦉', 'bat': '🦇', 'wolf': '🐺',
+      'boar': '🐗', 'horse': '🐴', 'unicorn': '🦄', 'bee': '🐝', 'honeybee': '🐝', 'bug': '🐛',
+      'butterfly': '🦋', 'snail': '🐌', 'beetle': '🪲', 'ant': '🐜', 'mosquito': '🦟', 'fly': '🪰',
+      'worm': '🪱', 'microbe': '🦠', 'snake': '🐍', 'lizard': '🦎', 'dragon': '🐉',
+      'dragon_face': '🐲', 'fire': '🔥', 'zap': '⚡', 'boom': '💥', 'collision': '💥',
+
+      // Food & Drink
+      'apple': '🍎', 'green_apple': '🍏', 'pear': '🍐', 'tangerine': '🍊', 'orange': '🍊',
+      'lemon': '🍋', 'banana': '🍌', 'watermelon': '🍉', 'grapes': '🍇', 'strawberry': '🍓',
+      'melon': '🍈', 'cherries': '🍒', 'peach': '🍑', 'pineapple': '🍍', 'coconut': '🥥',
+      'kiwi_fruit': '🥝', 'tomato': '🍅', 'eggplant': '🍆', 'avocado': '🥑', 'broccoli': '🥦',
+      'pizza': '🍕', 'hamburger': '🍔', 'fries': '🍟', 'hotdog': '🌭', 'sandwich': '🥪',
+      'taco': '🌮', 'burrito': '🌯', 'beer': '🍺', 'beers': '🍻', 'wine_glass': '🍷',
+      'cocktail': '🍸', 'tropical_drink': '🍹', 'coffee': '☕', 'tea': '🍵',
+
+      // Activities & Objects
+      'soccer': '⚽', 'basketball': '🏀', 'football': '🏈', 'baseball': '⚾', 'tennis': '🎾',
+      'volleyball': '🏐', 'rugby_football': '🏉', 'golf': '⛳', 'guitar': '🎸', 'violin': '🎻',
+      'piano': '🎹', 'trumpet': '🎺', 'saxophone': '🎷', 'drum': '🥁', 'microphone': '🎤',
+      'headphones': '🎧', 'radio': '📻', 'camera': '📷', 'video_camera': '📹', 'tv': '📺',
+      'computer': '💻', 'keyboard': '⌨️', 'computer_mouse': '🖱️', 'trackball': '🖲️',
+      'joystick': '🕹️', 'phone': '☎️', 'telephone': '☎️', 'iphone': '📱', 'calling': '📲',
+
+      // Symbols
+      'heart': '❤️', 'orange_heart': '🧡', 'yellow_heart': '💛', 'green_heart': '💚',
+      'blue_heart': '💙', 'purple_heart': '💜', 'brown_heart': '🤎', 'black_heart': '🖤',
+      'white_heart': '🤍', 'broken_heart': '💔', 'heart_exclamation': '❣️', 'two_hearts': '💕',
+      'revolving_hearts': '💞', 'heartbeat': '💓', 'heartpulse': '💗', 'sparkling_heart': '💖',
+      'cupid': '💘', 'gift_heart': '💝', 'kiss': '💋', 'ring': '💍', 'gem': '💎',
+      'bouquet': '💐', 'cherry_blossom': '🌸', 'white_flower': '💮', 'rosette': '🏵️',
+      'rose': '🌹', 'wilted_flower': '🥀', 'hibiscus': '🌺', 'sunflower': '🌻', 'blossom': '🌼',
+      'tulip': '🌷', 'seedling': '🌱', 'evergreen_tree': '🌲', 'deciduous_tree': '🌳',
+      'palm_tree': '🌴', 'cactus': '🌵', 'herb': '🌿', 'shamrock': '☘️', 'four_leaf_clover': '🍀',
+      'bamboo': '🎍', 'tanabata_tree': '🎋', 'leaves': '🍃', 'fallen_leaf': '🍂',
+      'maple_leaf': '🍁', 'mushroom': '🍄', 'ear_of_rice': '🌾', 'bouquet': '💐',
+
+      // Numbers
+      '0': '0️⃣', '1': '1️⃣', '2': '2️⃣', '3': '3️⃣', '4': '4️⃣', '5': '5️⃣',
+      '6': '6️⃣', '7': '7️⃣', '8': '8️⃣', '9': '9️⃣', '10': '🔟', '100': '💯',
+
+      // Common shortcuts
+      'cool': '😎', 'money_mouth': '🤑', 'facepalm': '🤦', 'shrug': '🤷'
+    };
+    
+    // Remove colons if present
+    const cleanName = emojiName.replace(/:/g, '');
+    return emojiMap[cleanName] || null;
   }
 
   addDecryptionIndicator(messageContent, method = 'unknown') {

@@ -554,10 +554,8 @@ class ECCrypto {
   getUserKey(userId) {
     const userInfo = this.userKeys.get(userId);
     if (userInfo) {
-      console.log('🔐 [EC] 🔍 Found key for user:', userId, '- Key ID:', userInfo.keyId);
-      return userInfo.publicKey;
-    }
-    console.log('🔐 [EC] ❌ No key found for user:', userId);
+          return userInfo.publicKey;
+  }
     return null;
   }
 
@@ -575,10 +573,6 @@ class ECCrypto {
         latestTime = userInfo.lastSeen;
         mostRecent = { userId, ...userInfo };
       }
-    }
-    
-    if (mostRecent) {
-      // console.log('🔐 [EC] 🎯 Most recent user key:', mostRecent.userId, '- Key ID:', mostRecent.keyId);
     }
     
     return mostRecent;
@@ -646,7 +640,6 @@ class ECCrypto {
     try {
       this.userKeys.clear();
       await chrome.storage.local.set({ ecUserKeys: {} });
-      // console.log('🔐 [EC] All contacts cleared');
     } catch (error) {
       console.error('Failed to clear contacts:', error);
       throw error;
@@ -672,7 +665,6 @@ class ECCrypto {
         this.setupRotationTimer(intervalMs);
       }
       
-      // console.log('🔐 [EC] Rotation interval updated:', intervalMs);
     } catch (error) {
       console.error('Failed to update rotation interval:', error);
       throw error;
@@ -766,9 +758,6 @@ class ECCrypto {
   // ==================== ENCRYPTION/DECRYPTION ====================
 
   async encrypt(plaintext, recipientUserId = null) {
-    console.log('🔐 [EC] 📤 ENCRYPTING MESSAGE...');
-    console.log('🔐 [EC] 📝 Message:', plaintext);
-    console.log('🔐 [EC] 🎯 Recipient:', recipientUserId || 'auto-detect');
     
     let recipientPublicKey;
     let keyUsed = 'static';
@@ -779,7 +768,6 @@ class ECCrypto {
       if (userPublicKeyBase64) {
         recipientPublicKey = await this.importPublicKey(userPublicKeyBase64);
         keyUsed = 'user_specific';
-        console.log('🔐 [EC] 🔑 Using specific user key for:', recipientUserId);
       }
     }
     
@@ -789,16 +777,14 @@ class ECCrypto {
       if (mostRecent) {
         recipientPublicKey = await this.importPublicKey(mostRecent.publicKey);
         keyUsed = 'most_recent';
-        console.log('🔐 [EC] 🔑 Using most recent user key from:', mostRecent.userId);
       }
     }
     
     // Final fallback to static key
-    if (!recipientPublicKey) {
-      recipientPublicKey = this.staticPublicKey;
-      keyUsed = 'static';
-      console.log('🔐 [EC] 🔑 Using static fallback key');
-    }
+          if (!recipientPublicKey) {
+        recipientPublicKey = this.staticPublicKey;
+        keyUsed = 'static';
+      }
     
     try {
       // Derive shared secret and AES key

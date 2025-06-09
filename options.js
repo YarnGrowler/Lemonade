@@ -66,15 +66,8 @@ class OptionsManager {
     setTimeout(async () => {
       const stored = await chrome.storage.local.get(['ecStaticPublicKey', 'ecMyKeyId']);
       if (stored.ecStaticPublicKey || stored.ecMyKeyId) {
-        console.log('EC keys detected, loading key information...');
         await this.updateCurrentKeyInfo();
         await this.refreshContactsList();
-        
-        // If keys exist but asymmetric mode isn't enabled, suggest enabling it
-        const ecEnabled = await chrome.storage.local.get(['ecEnabled']);
-        if (!ecEnabled.ecEnabled) {
-          console.log('EC keys exist but asymmetric mode is disabled');
-        }
       }
     }, 500);
   }
@@ -1421,7 +1414,6 @@ class OptionsManager {
       
       // If we don't have a last rotation time, set it now for future calculations
       if (!stored.ecLastRotation) {
-        console.log('⏰ Setting initial rotation baseline timestamp');
         await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
       }
       
@@ -1437,9 +1429,7 @@ class OptionsManager {
         const overdueBy = Math.abs(timeUntil);
         document.getElementById('next-rotation').textContent = 'Due for rotation';
         
-        if (overdueBy > 60000) { // More than 1 minute overdue
-          console.log(`⏰ Key rotation overdue by ${this.formatTime(overdueBy)}`);
-        }
+
       }
       
     } catch (error) {

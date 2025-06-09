@@ -35,9 +35,7 @@ class ECMessageProcessor {
       throw new Error('Message processor not initialized');
     }
 
-    console.log('🔐 [MSG] 📤 ENCRYPTING MESSAGE...');
-    console.log('🔐 [MSG] 📝 Text:', plaintext);
-    console.log('🔐 [MSG] 🎯 Recipient:', recipientUserId || 'auto-detect');
+
 
     try {
       // Encrypt using ECCrypto
@@ -49,10 +47,7 @@ class ECMessageProcessor {
       // Encode as Chinese characters for stealth
       const chineseMessage = this.encodeAsChineseCharacters(formattedMessage);
       
-      console.log('🔐 [MSG] ✅ ENCRYPTION COMPLETE!');
-      console.log('🔐 [MSG] 🔑 Key strategy:', encryptedData.keyUsed);
-      console.log('🔐 [MSG] 🆔 Key ID:', encryptedData.keyId);
-      console.log('🔐 [MSG] 📦 Final length:', chineseMessage.length);
+
       
       return chineseMessage;
       
@@ -69,14 +64,11 @@ class ECMessageProcessor {
       throw new Error('Message processor not initialized');
     }
 
-    console.log('🔐 [MSG] 📨 DECRYPTING MESSAGE...');
-    console.log('🔐 [MSG] 👤 Sender:', senderUserId || 'unknown');
-    console.log('🔐 [MSG] 📦 Message length:', chineseMessage.length);
+
 
     try {
       // Decode Chinese characters back to formatted message
       const decodedMessage = this.decodeChineseCharacters(chineseMessage);
-      console.log('🔐 [MSG] 🔄 Decoded format:', decodedMessage.substring(0, 50) + '...');
       
       // Parse the message format: EC:encryptedData:PK:senderPublicKey:keyId
       const match = decodedMessage.match(/^EC:([A-Za-z0-9+/=]+):PK:([A-Za-z0-9+/=]+):([A-Za-z0-9+/=]{12})$/);
@@ -87,9 +79,7 @@ class ECMessageProcessor {
       
       const [, encryptedData, senderPublicKey, keyId] = match;
       
-      console.log('🔐 [MSG] 🔍 PARSING MESSAGE...');
-      console.log('🔐 [MSG] 🆔 Sender Key ID:', keyId);
-      console.log('🔐 [MSG] 📦 Encrypted data length:', encryptedData.length);
+
       
       // Extract and store sender's public key if we have user info
       if (senderUserId) {
@@ -99,8 +89,7 @@ class ECMessageProcessor {
       // Decrypt the message
       const decryptedText = await this.ecCrypto.decrypt(encryptedData, senderPublicKey, senderUserId);
       
-      console.log('🔐 [MSG] ✅ DECRYPTION SUCCESS!');
-      console.log('🔐 [MSG] 📝 Decrypted:', decryptedText);
+
       
       return decryptedText;
       
@@ -115,27 +104,18 @@ class ECMessageProcessor {
   async storeSenderPublicKey(senderUserId, publicKeyBase64, keyId, username = 'Unknown') {
     if (!this.ecCrypto) return;
     
-    console.log('🔐 [MSG] 🔍 STORING SENDER PUBLIC KEY...');
-    console.log('🔐 [MSG] 👤 User ID:', senderUserId || 'Not available');
-    console.log('🔐 [MSG] 🆔 Key ID:', keyId);
-    console.log('🔐 [MSG] 👤 Username:', username);
+
     
     // CRITICAL: Prevent storing our own key due to DOM confusion
     const currentUser = this.ecCrypto.getCurrentUser();
     if (currentUser.userId && senderUserId === currentUser.userId) {
-      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store key for current user (DOM confusion)');
-      console.log('🔐 [MSG] ⚠️ Current User ID:', currentUser.userId);
-      console.log('🔐 [MSG] ⚠️ Extracted User ID:', senderUserId);
-      console.log('🔐 [MSG] ⚠️ This prevents recipient key corruption!');
+      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store key for current user');
       return;
     }
     
     // ADDITIONAL: Prevent storing if key ID matches our own key
     if (this.ecCrypto.myKeyId && keyId === this.ecCrypto.myKeyId) {
       console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store our own key ID');
-      console.log('🔐 [MSG] ⚠️ Our Key ID:', this.ecCrypto.myKeyId);
-      console.log('🔐 [MSG] ⚠️ Extracted Key ID:', keyId);
-      console.log('🔐 [MSG] ⚠️ This prevents self-key storage!');
       return;
     }
     
@@ -188,7 +168,7 @@ class ECMessageProcessor {
   }
 
   async scanMessageForPublicKeys(chineseMessage, messageElement = null) {
-    console.log('🔐 [MSG] 🔍 SCANNING MESSAGE FOR PUBLIC KEYS...');
+
     
     try {
       // Decode the message
@@ -592,7 +572,7 @@ class ECMessageProcessor {
   // ==================== ENCODING/DECODING ====================
 
   encodeAsChineseCharacters(message) {
-    console.log('🔐 [MSG] 🈲 Encoding as Chinese characters...');
+
     
     // Convert message to base64 first for safety
     const base64Message = btoa(message);
