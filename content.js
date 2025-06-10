@@ -1029,8 +1029,9 @@ class DiscordCryptochat {
     let encryptedMessage = null;
     let encryptionMethod = 'none';
     
-    // Try asymmetric encryption first
-    if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+    // Try asymmetric encryption first - BUT ONLY IF ENABLED
+    const ecSettings = await chrome.storage.local.get(['ecEnabled']);
+    if (ecSettings.ecEnabled && this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
       try {
         // console.log('🔐 [GIF] 🔐 Trying asymmetric encryption...');
                  const asymmetricResult = await this.encryptAsymmetricMessage(tenorUrl);
@@ -1044,6 +1045,8 @@ class DiscordCryptochat {
       } catch (error) {
         // console.log('🔐 [GIF] ❌ Asymmetric encryption error:', error.message);
       }
+    } else if (!ecSettings.ecEnabled) {
+      // console.log('🔐 [GIF] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
     }
     
     // Fallback to symmetric encryption if asymmetric failed
@@ -1406,8 +1409,9 @@ class DiscordCryptochat {
       // console.log('🔐 [ENCRYPT] 📤 Encrypting outgoing message...');
       // console.log('🔐 [ENCRYPT] Original message:', actualMessage);
 
-      // Try asymmetric encryption first if available
-      if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+      // Try asymmetric encryption first if available - BUT ONLY IF ENABLED
+      const ecSettings = await chrome.storage.local.get(['ecEnabled']);
+      if (ecSettings.ecEnabled && this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
         // console.log('🔐 [ENCRYPT] 🔐 Trying asymmetric encryption...');
         try {
           const asymmetricResult = await this.encryptAsymmetricMessage(actualMessage);
@@ -1424,6 +1428,8 @@ class DiscordCryptochat {
         } catch (asymmetricError) {
           // console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error:', asymmetricError.message);
         }
+      } else if (!ecSettings.ecEnabled) {
+        // console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
       } else {
         // console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available');
       }
