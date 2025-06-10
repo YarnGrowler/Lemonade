@@ -66,8 +66,15 @@ class OptionsManager {
     setTimeout(async () => {
       const stored = await chrome.storage.local.get(['ecStaticPublicKey', 'ecMyKeyId']);
       if (stored.ecStaticPublicKey || stored.ecMyKeyId) {
+        //console.log('EC keys detected, loading key information...');
         await this.updateCurrentKeyInfo();
         await this.refreshContactsList();
+        
+        // If keys exist but asymmetric mode isn't enabled, suggest enabling it
+        const ecEnabled = await chrome.storage.local.get(['ecEnabled']);
+        if (!ecEnabled.ecEnabled) {
+          //console.log('EC keys exist but asymmetric mode is disabled');
+        }
       }
     }, 500);
   }
@@ -494,7 +501,7 @@ class OptionsManager {
       lastRotationTimestamp: 0
     });
     
-    console.log(`🔐 [CRYPTO] 🔄 Key rotation setup: ${intervalMs}ms intervals, tracking reset`);
+    //console.log(`🔐 [CRYPTO] 🔄 Key rotation setup: ${intervalMs}ms intervals, tracking reset`);
   }
 
   async updateRotationStatus() {
@@ -870,7 +877,7 @@ class OptionsManager {
         
         await Promise.all(notifications);
       } catch (tabError) {
-        console.log('Tab messaging not available in options page context');
+        //console.log('Tab messaging not available in options page context');
       }
 
       this.speedStatus.textContent = `✅ Saved: ${scanFrequency}ms scan, ${initialDelay}ms initial delay`;
@@ -1035,7 +1042,7 @@ class OptionsManager {
       
       // If there's a rotation interval set, make sure the timer is properly initialized
       if (stored.ecRotationInterval && stored.ecRotationInterval !== null) {
-        console.log(`Resetting rotation timer with ${stored.ecRotationInterval}ms interval`);
+        //console.log(`Resetting rotation timer with ${stored.ecRotationInterval}ms interval`);
       }
       
       // Notify all Discord tabs
@@ -1051,7 +1058,7 @@ class OptionsManager {
       
       this.startAsymmetricStatusUpdates();
       
-      console.log('Asymmetric encryption enabled');
+      //console.log('Asymmetric encryption enabled');
       
     } catch (error) {
       console.error('Failed to enable asymmetric mode:', error);
@@ -1078,7 +1085,7 @@ class OptionsManager {
       // Update status display
       document.getElementById('ec-status-text').textContent = 'Disabled';
       
-      console.log('Asymmetric encryption disabled');
+      //console.log('Asymmetric encryption disabled');
       
     } catch (error) {
       console.error('Failed to disable asymmetric mode:', error);
@@ -1101,7 +1108,7 @@ class OptionsManager {
       
       await Promise.all(notifications);
       
-      console.log(`EC rotation interval updated to ${intervalMs}ms`);
+      //console.log(`EC rotation interval updated to ${intervalMs}ms`);
       
     } catch (error) {
       console.error('Failed to update EC rotation interval:', error);
@@ -1120,11 +1127,11 @@ class OptionsManager {
       for (const tab of tabs) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'rotateKeys' });
-          console.log(`Sent rotation command to tab ${tab.id}`);
+          //console.log(`Sent rotation command to tab ${tab.id}`);
           rotationSuccess = true;
           break; // Only need one successful command
         } catch (error) {
-          console.log(`Failed to send rotation command to tab ${tab.id}:`, error);
+          //console.log(`Failed to send rotation command to tab ${tab.id}:`, error);
           // Try next tab
         }
       }
@@ -1414,6 +1421,7 @@ class OptionsManager {
       
       // If we don't have a last rotation time, set it now for future calculations
       if (!stored.ecLastRotation) {
+        //console.log('⏰ Setting initial rotation baseline timestamp');
         await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
       }
       
@@ -1429,7 +1437,9 @@ class OptionsManager {
         const overdueBy = Math.abs(timeUntil);
         document.getElementById('next-rotation').textContent = 'Due for rotation';
         
-
+        if (overdueBy > 60000) { // More than 1 minute overdue
+          //console.log(`⏰ Key rotation overdue by ${this.formatTime(overdueBy)}`);
+        }
       }
       
     } catch (error) {
@@ -1978,7 +1988,7 @@ class OptionsManager {
             return;
           }
         } catch (error) {
-          console.log('Failed to detect user ID from tab:', tab.id);
+          //console.log('Failed to detect user ID from tab:', tab.id);
         }
       }
       

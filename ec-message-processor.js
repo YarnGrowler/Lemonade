@@ -9,7 +9,7 @@ class ECMessageProcessor {
     this.messagePrefix = 'EC:';
     this.isEnabled = false;
     
-    console.log('🔐 [MSG] Initializing simplified message processor...');
+    //console.log('🔐 [MSG] Initializing simplified message processor...');
     this.init();
   }
 
@@ -19,7 +19,7 @@ class ECMessageProcessor {
       if (typeof window.ecCrypto !== 'undefined') {
         this.ecCrypto = window.ecCrypto;
         this.isEnabled = true;
-        console.log('🔐 [MSG] ✅ Message processor initialized');
+        //console.log('🔐 [MSG] ✅ Message processor initialized');
       } else {
         setTimeout(() => this.init(), 500);
       }
@@ -109,30 +109,30 @@ class ECMessageProcessor {
     // CRITICAL: Prevent storing our own key due to DOM confusion
     const currentUser = this.ecCrypto.getCurrentUser();
     if (currentUser.userId && senderUserId === currentUser.userId) {
-      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store key for current user');
+      //console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store key for current user');
       return;
     }
     
     // ADDITIONAL: Prevent storing if key ID matches our own key
     if (this.ecCrypto.myKeyId && keyId === this.ecCrypto.myKeyId) {
-      console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store our own key ID');
+      //console.log('🔐 [MSG] ⚠️ BLOCKED: Attempted to store our own key ID');
       return;
     }
     
     // If no user ID, try to find existing user with this key ID or create temp entry
     if (!senderUserId || senderUserId === 'null' || senderUserId === null) {
-      console.log('🔐 [MSG] 🔍 No user ID provided, checking for existing keys...');
+      //console.log('🔐 [MSG] 🔍 No user ID provided, checking for existing keys...');
       
       // Check if we have this exact key already stored
       const existingUsers = this.ecCrypto.userKeys || new Map();
       for (const [existingUserId, existingUserInfo] of existingUsers) {
         if (existingUserInfo.keyId === keyId) {
-          console.log('🔐 [MSG] 🔄 Found existing user with same key ID:', existingUserId);
+          //console.log('🔐 [MSG] 🔄 Found existing user with same key ID:', existingUserId);
           // Update this user's last seen time and username if better
           existingUserInfo.lastSeen = Date.now();
           if (username !== 'Unknown' && username !== existingUserInfo.username) {
             existingUserInfo.username = username;
-            console.log('🔐 [MSG] 📝 Updated username for existing user');
+            //console.log('🔐 [MSG] 📝 Updated username for existing user');
           }
           await this.ecCrypto.saveUserKeys();
           return;
@@ -141,9 +141,9 @@ class ECMessageProcessor {
       
       // If no exact match, create a temporary entry with key ID as identifier
       const tempUserId = `temp_${keyId}`;
-      console.log('🔐 [MSG] 🆕 Creating temporary user entry:', tempUserId);
+      //console.log('🔐 [MSG] 🆕 Creating temporary user entry:', tempUserId);
               await this.ecCrypto.addUserKey(tempUserId, publicKeyBase64, username);
-      console.log('🔐 [MSG] 🆕 TEMP KEY STORED!');
+      //console.log('🔐 [MSG] 🆕 TEMP KEY STORED!');
       return;
     }
     
@@ -154,9 +154,9 @@ class ECMessageProcessor {
     if (!existingKey || existingKeyId !== keyId) {
       // New user or new key for existing user
       await this.ecCrypto.addUserKey(senderUserId, publicKeyBase64, username);
-      console.log('🔐 [MSG] 🆕 NEW KEY STORED!');
+      //console.log('🔐 [MSG] 🆕 NEW KEY STORED!');
     } else {
-      console.log('🔐 [MSG] ✅ Key already known, updating last seen');
+      //console.log('🔐 [MSG] ✅ Key already known, updating last seen');
       // Update last seen time for existing key
       const userInfo = this.ecCrypto.userKeys.get(senderUserId);
       if (userInfo) {
@@ -179,7 +179,7 @@ class ECMessageProcessor {
       const matches = [...decodedMessage.matchAll(publicKeyPattern)];
       
       if (matches.length > 0) {
-        console.log('🔐 [MSG] 🎯 Found', matches.length, 'public key(s)!');
+        //console.log('🔐 [MSG] 🎯 Found', matches.length, 'public key(s)!');
         
         // Extract Discord user info from message element
         let userInfo = { userId: null, username: 'Unknown' };
@@ -190,7 +190,7 @@ class ECMessageProcessor {
         // Process each public key
         for (const match of matches) {
           const [, publicKey, keyId] = match;
-          console.log('🔐 [MSG] 🔑 Processing public key - ID:', keyId);
+          //console.log('🔐 [MSG] 🔑 Processing public key - ID:', keyId);
           
           // Always store the public key, even if we don't have user ID
           await this.storeSenderPublicKey(userInfo.userId, publicKey, keyId, userInfo.username);
@@ -198,7 +198,7 @@ class ECMessageProcessor {
         
         return true;
       } else {
-        console.log('🔐 [MSG] ❌ No public keys found in message');
+        //console.log('🔐 [MSG] ❌ No public keys found in message');
         return false;
       }
       
@@ -209,7 +209,7 @@ class ECMessageProcessor {
   }
 
   async extractDiscordUserInfo(messageElement) {
-    console.log('🔐 [MSG] 👤 EXTRACTING USER INFO FROM MESSAGE...');
+    //console.log('🔐 [MSG] 👤 EXTRACTING USER INFO FROM MESSAGE...');
     
     try {
       // Start from the message element and traverse up to find the message container
@@ -232,14 +232,14 @@ class ECMessageProcessor {
       }
       
       if (!messageContainer) {
-        console.log('🔐 [MSG] ⚠️ Could not find message container, using provided element');
+        //console.log('🔐 [MSG] ⚠️ Could not find message container, using provided element');
         messageContainer = messageElement;
       }
       
       let userId = null;
       let username = 'Unknown';
       
-      console.log('🔐 [MSG] 🔍 Searching for avatar image...');
+      //console.log('🔐 [MSG] 🔍 Searching for avatar image...');
       
       // Method 1: Find avatar image with user ID in URL (MOST RELIABLE)
       // Look for patterns like: /avatars/852155629836828683/hash.webp
@@ -255,8 +255,8 @@ class ECMessageProcessor {
       for (const selector of avatarSelectors) {
         avatarImg = messageContainer.querySelector(selector);
         if (avatarImg && avatarImg.src && avatarImg.src.includes('/avatars/')) {
-          console.log('🔐 [MSG] 🎯 Found avatar with selector:', selector);
-          console.log('🔐 [MSG] 🔗 Avatar URL:', avatarImg.src);
+          //console.log('🔐 [MSG] 🎯 Found avatar with selector:', selector);
+          //console.log('🔐 [MSG] 🔗 Avatar URL:', avatarImg.src);
           break;
         }
       }
@@ -274,14 +274,14 @@ class ECMessageProcessor {
         for (const match of avatarMatches) {
           if (match && match[1]) {
             userId = match[1];
-            console.log('🔐 [MSG] ✅ Extracted user ID from avatar:', userId);
+            //console.log('🔐 [MSG] ✅ Extracted user ID from avatar:', userId);
             break;
           } else if (match && Array.isArray(match)) {
             // For the global match, take the first valid Discord user ID
             for (const id of match) {
               if (id.length >= 17 && id.length <= 19) {
                 userId = id;
-                console.log('🔐 [MSG] ✅ Extracted user ID (pattern match):', userId);
+                //console.log('🔐 [MSG] ✅ Extracted user ID (pattern match):', userId);
                 break;
               }
             }
@@ -289,10 +289,10 @@ class ECMessageProcessor {
           }
         }
       } else {
-        console.log('🔐 [MSG] ❌ No avatar image found or no src attribute');
+        //console.log('🔐 [MSG] ❌ No avatar image found or no src attribute');
       }
       
-      console.log('🔐 [MSG] 🔍 Searching for username...');
+      //console.log('🔐 [MSG] 🔍 Searching for username...');
       
       // Method 2: Extract username from various possible locations
       const usernameSelectors = [
@@ -310,12 +310,12 @@ class ECMessageProcessor {
       ];
       
       for (const selector of usernameSelectors) {
-        console.log('🔐 [MSG] 🔍 Trying username selector:', selector);
+        //console.log('🔐 [MSG] 🔍 Trying username selector:', selector);
         const usernameElement = messageContainer.querySelector(selector);
         if (usernameElement) {
-          console.log('🔐 [MSG] 🎯 Found element with selector:', selector);
-          console.log('🔐 [MSG] 📝 Element text content:', usernameElement.textContent);
-          console.log('🔐 [MSG] 📝 Element data-text:', usernameElement.getAttribute('data-text'));
+          //console.log('🔐 [MSG] 🎯 Found element with selector:', selector);
+          //console.log('🔐 [MSG] 📝 Element text content:', usernameElement.textContent);
+          //console.log('🔐 [MSG] 📝 Element data-text:', usernameElement.getAttribute('data-text'));
           
           // Try textContent first
           let extractedUsername = usernameElement.textContent ? usernameElement.textContent.trim() : '';
@@ -325,19 +325,19 @@ class ECMessageProcessor {
             const dataText = usernameElement.getAttribute('data-text');
             if (dataText && dataText.trim()) {
               extractedUsername = dataText.trim();
-              console.log('🔐 [MSG] 🔄 Using data-text instead:', extractedUsername);
+              //console.log('🔐 [MSG] 🔄 Using data-text instead:', extractedUsername);
             }
           }
           
           if (extractedUsername && extractedUsername !== 'Unknown' && extractedUsername.length > 0) {
             username = extractedUsername;
-            console.log('🔐 [MSG] ✅ Found username with selector:', selector, '- Username:', username);
+            //console.log('🔐 [MSG] ✅ Found username with selector:', selector, '- Username:', username);
             break;
           } else {
-            console.log('🔐 [MSG] ❌ Username not useful:', extractedUsername);
+            //console.log('🔐 [MSG] ❌ Username not useful:', extractedUsername);
           }
         } else {
-          console.log('🔐 [MSG] ❌ No element found with selector:', selector);
+          //console.log('🔐 [MSG] ❌ No element found with selector:', selector);
         }
       }
       
@@ -348,14 +348,14 @@ class ECMessageProcessor {
           const dataText = dataTextElement.getAttribute('data-text');
           if (dataText && dataText.trim()) {
             username = dataText.trim();
-            console.log('🔐 [MSG] ✅ Found username from data-text:', username);
+            //console.log('🔐 [MSG] ✅ Found username from data-text:', username);
           }
         }
       }
       
       // Method 4: Look for user links with IDs (Discord profile links)
       if (!userId) {
-        console.log('🔐 [MSG] 🔍 Searching for user profile links...');
+        //console.log('🔐 [MSG] 🔍 Searching for user profile links...');
         const userLinkSelectors = [
           'a[href*="/users/"]',
           '[href*="/users/"]',
@@ -370,7 +370,7 @@ class ECMessageProcessor {
               const match = userLink.href.match(/\/users\/(\d{17,19})/);
               if (match) {
                 userId = match[1];
-                console.log('🔐 [MSG] ✅ Found user ID from profile link:', userId);
+                //console.log('🔐 [MSG] ✅ Found user ID from profile link:', userId);
                 break;
               }
             }
@@ -379,7 +379,7 @@ class ECMessageProcessor {
             const dataUserId = userLink.getAttribute('data-user-id') || userLink.getAttribute('user-id');
             if (dataUserId && dataUserId !== '0' && dataUserId.match(/^\d{17,19}$/)) {
               userId = dataUserId;
-              console.log('🔐 [MSG] ✅ Found user ID from data attribute:', userId);
+              //console.log('🔐 [MSG] ✅ Found user ID from data attribute:', userId);
               break;
             }
           }
@@ -388,13 +388,13 @@ class ECMessageProcessor {
       
       // Method 5: Look in previous sibling messages if no avatar (Discord groups messages)
       if (!userId && !avatarImg) {
-        console.log('🔐 [MSG] 🔍 No avatar found, checking previous messages...');
+        //console.log('🔐 [MSG] 🔍 No avatar found, checking previous messages...');
         let previousMessage = messageContainer.previousElementSibling;
         let lookbackAttempts = 0;
         const maxLookback = 15; // Increased from 5 to 15
         
         while (previousMessage && lookbackAttempts < maxLookback) {
-          console.log('🔐 [MSG] 🔍 Checking previous message', lookbackAttempts + 1, ':', previousMessage.className);
+          //console.log('🔐 [MSG] 🔍 Checking previous message', lookbackAttempts + 1, ':', previousMessage.className);
           
           // Look for avatar in this previous message
           const prevAvatarSelectors = [
@@ -407,8 +407,8 @@ class ECMessageProcessor {
           for (const selector of prevAvatarSelectors) {
             prevAvatar = previousMessage.querySelector(selector);
             if (prevAvatar && prevAvatar.src && prevAvatar.src.includes('/avatars/')) {
-              console.log('🔐 [MSG] 🎯 Found avatar in previous message with selector:', selector);
-              console.log('🔐 [MSG] 🔗 Previous avatar URL:', prevAvatar.src);
+              //console.log('🔐 [MSG] 🎯 Found avatar in previous message with selector:', selector);
+              //console.log('🔐 [MSG] 🔗 Previous avatar URL:', prevAvatar.src);
               break;
             }
           }
@@ -424,13 +424,13 @@ class ECMessageProcessor {
             for (const match of avatarMatches) {
               if (match && match[1]) {
                 userId = match[1];
-                console.log('🔐 [MSG] ✅ Extracted user ID from previous message avatar:', userId);
+                //console.log('🔐 [MSG] ✅ Extracted user ID from previous message avatar:', userId);
                 break;
               } else if (match && Array.isArray(match)) {
                 for (const id of match) {
                   if (id.length >= 17 && id.length <= 19) {
                     userId = id;
-                    console.log('🔐 [MSG] ✅ Extracted user ID from previous message (pattern):', userId);
+                    //console.log('🔐 [MSG] ✅ Extracted user ID from previous message (pattern):', userId);
                     break;
                   }
                 }
@@ -439,7 +439,7 @@ class ECMessageProcessor {
             }
             
             if (userId) {
-              console.log('🔐 [MSG] 🎯 SUCCESS! Found user ID in previous message #' + (lookbackAttempts + 1));
+              //console.log('🔐 [MSG] 🎯 SUCCESS! Found user ID in previous message #' + (lookbackAttempts + 1));
               break;
             }
           }
@@ -459,7 +459,7 @@ class ECMessageProcessor {
                 const extractedUsername = prevUsername.textContent.trim();
                 if (extractedUsername !== 'Unknown' && extractedUsername.length > 0) {
                   username = extractedUsername;
-                  console.log('🔐 [MSG] ✅ Found username from previous message:', username);
+                  //console.log('🔐 [MSG] ✅ Found username from previous message:', username);
                   break;
                 }
               }
@@ -471,13 +471,13 @@ class ECMessageProcessor {
         }
         
         if (!userId) {
-          console.log('🔐 [MSG] ❌ Could not find user ID in any of the previous', maxLookback, 'messages');
+          //console.log('🔐 [MSG] ❌ Could not find user ID in any of the previous', maxLookback, 'messages');
         }
       }
       
       // Method 6: Look in next sibling messages too (sometimes avatars are there)
       if (!userId && !avatarImg) {
-        console.log('🔐 [MSG] 🔍 Checking next messages for avatar...');
+        //console.log('🔐 [MSG] 🔍 Checking next messages for avatar...');
         let nextMessage = messageContainer.nextElementSibling;
         let lookforwardAttempts = 0;
         const maxLookforward = 5;
@@ -488,7 +488,7 @@ class ECMessageProcessor {
             const match = nextAvatar.src.match(/\/avatars\/(\d{17,19})\//);
             if (match) {
               userId = match[1];
-              console.log('🔐 [MSG] ✅ Found user ID from next message avatar:', userId);
+              //console.log('🔐 [MSG] ✅ Found user ID from next message avatar:', userId);
               break;
             }
           }
@@ -500,7 +500,7 @@ class ECMessageProcessor {
       
       // Method 7: Look for parent container with more context
       if (!userId) {
-        console.log('🔐 [MSG] 🔍 Looking in parent containers for avatar...');
+        //console.log('🔐 [MSG] 🔍 Looking in parent containers for avatar...');
         let parentContainer = messageContainer.parentElement;
         let parentAttempts = 0;
         const maxParentAttempts = 3;
@@ -511,7 +511,7 @@ class ECMessageProcessor {
             const match = parentAvatar.src.match(/\/avatars\/(\d{17,19})\//);
             if (match) {
               userId = match[1];
-              console.log('🔐 [MSG] ✅ Found user ID from parent container avatar:', userId);
+              //console.log('🔐 [MSG] ✅ Found user ID from parent container avatar:', userId);
               break;
             }
           }
@@ -529,36 +529,36 @@ class ECMessageProcessor {
           const idMatch = messageId.match(/(\d{17,19})/);
           if (idMatch) {
             userId = idMatch[1];
-            console.log('🔐 [MSG] ✅ Extracted user ID from message ID:', userId);
+            //console.log('🔐 [MSG] ✅ Extracted user ID from message ID:', userId);
           }
         }
       }
       
       // Method 9: AGGRESSIVE CHANNEL SCAN - scan entire message history for avatars
       if (!userId) {
-        console.log('🔐 [MSG] 🔍 AGGRESSIVE SCAN: Searching entire channel for recent avatars...');
+        //console.log('🔐 [MSG] 🔍 AGGRESSIVE SCAN: Searching entire channel for recent avatars...');
         userId = await this.scanEntireChannelForUserAvatar(messageContainer);
         if (userId) {
-          console.log('🔐 [MSG] 🎯 AGGRESSIVE SCAN SUCCESS! Found user ID:', userId);
+          //console.log('🔐 [MSG] 🎯 AGGRESSIVE SCAN SUCCESS! Found user ID:', userId);
         }
       }
       
       // Final validation
       if (userId && !userId.match(/^\d{17,19}$/)) {
-        console.log('🔐 [MSG] ⚠️ Invalid user ID format, discarding:', userId);
+        //console.log('🔐 [MSG] ⚠️ Invalid user ID format, discarding:', userId);
         userId = null;
       }
       
-      console.log('🔐 [MSG] 📋 FINAL EXTRACTED USER INFO:');
-      console.log('🔐 [MSG] 🆔 User ID:', userId || 'NOT FOUND');
-      console.log('🔐 [MSG] 👤 Username:', username);
-      console.log('🔐 [MSG] 🏗️ Message container:', messageContainer.tagName, messageContainer.className);
+      //console.log('🔐 [MSG] 📋 FINAL EXTRACTED USER INFO:');
+      //console.log('🔐 [MSG] 🆔 User ID:', userId || 'NOT FOUND');
+      //console.log('🔐 [MSG] 👤 Username:', username);
+      //console.log('🔐 [MSG] 🏗️ Message container:', messageContainer.tagName, messageContainer.className);
       
       if (!userId) {
-        console.log('🔐 [MSG] ❌ FAILED TO EXTRACT USER ID - this will create temp contacts');
+        //console.log('🔐 [MSG] ❌ FAILED TO EXTRACT USER ID - this will create temp contacts');
         // Log the DOM structure for debugging
-        console.log('🔐 [MSG] 🔍 DOM structure for debugging:');
-        console.log('🔐 [MSG] Container HTML (first 200 chars):', messageContainer.innerHTML.substring(0, 200));
+        //console.log('🔐 [MSG] 🔍 DOM structure for debugging:');
+        //console.log('🔐 [MSG] Container HTML (first 200 chars):', messageContainer.innerHTML.substring(0, 200));
       }
       
       return { userId, username };
@@ -598,12 +598,12 @@ class ECMessageProcessor {
       }
     }
     
-    console.log('🔐 [MSG] ✅ Encoded to Chinese characters - length:', result.length);
+    //console.log('🔐 [MSG] ✅ Encoded to Chinese characters - length:', result.length);
     return result;
   }
 
   decodeChineseCharacters(chineseMessage) {
-    console.log('🔐 [MSG] 🈲 Decoding Chinese characters...');
+    //console.log('🔐 [MSG] 🈲 Decoding Chinese characters...');
     
     try {
       // Remove spaces
@@ -637,7 +637,7 @@ class ECMessageProcessor {
       
       // Decode from base64
       const decodedMessage = atob(base64Message);
-      console.log('🔐 [MSG] ✅ Decoded from Chinese characters');
+      //console.log('🔐 [MSG] ✅ Decoded from Chinese characters');
       
       return decodedMessage;
       
@@ -679,18 +679,18 @@ class ECMessageProcessor {
   // Aggressive method to scan entire channel for user avatars when local methods fail
   async scanEntireChannelForUserAvatar(currentMessageContainer) {
     try {
-      console.log('🔐 [MSG] 🔍 AGGRESSIVE SCAN: Starting channel-wide avatar search...');
+      //console.log('🔐 [MSG] 🔍 AGGRESSIVE SCAN: Starting channel-wide avatar search...');
       
       // Find the main messages container (scrollable area)
       const messagesContainer = document.querySelector('[class*="scrollerInner"], ol[aria-label*="Messages"]');
       if (!messagesContainer) {
-        console.log('🔐 [MSG] ❌ Could not find messages container for aggressive scan');
+        //console.log('🔐 [MSG] ❌ Could not find messages container for aggressive scan');
         return null;
       }
       
       // Get all message elements in the channel
       const allMessages = messagesContainer.querySelectorAll('[class*="message"], li[class*="messageListItem"]');
-      console.log('🔐 [MSG] 🔍 Found', allMessages.length, 'total messages in channel');
+      //console.log('🔐 [MSG] 🔍 Found', allMessages.length, 'total messages in channel');
       
       // Start from current message and scan backwards (most recent avatars first)
       const currentIndex = Array.from(allMessages).indexOf(currentMessageContainer);
@@ -701,11 +701,11 @@ class ECMessageProcessor {
         const startIndex = Math.max(0, currentIndex - 50);
         const endIndex = Math.min(allMessages.length, currentIndex + 10);
         scanRange = Array.from(allMessages).slice(startIndex, endIndex);
-        console.log('🔐 [MSG] 🔍 Scanning', scanRange.length, 'messages around current position');
+        //console.log('🔐 [MSG] 🔍 Scanning', scanRange.length, 'messages around current position');
       } else {
         // Fallback: scan last 100 messages
         scanRange = Array.from(allMessages).slice(-100);
-        console.log('🔐 [MSG] 🔍 Fallback: scanning last', scanRange.length, 'messages');
+        //console.log('🔐 [MSG] 🔍 Fallback: scanning last', scanRange.length, 'messages');
       }
       
       // Look for avatars in the scan range
@@ -719,14 +719,14 @@ class ECMessageProcessor {
         if (avatar && avatar.src) {
           const match = avatar.src.match(/\/avatars\/(\d{17,19})\//);
           if (match) {
-            console.log('🔐 [MSG] 🎯 AGGRESSIVE SCAN: Found user ID in message', i, ':', match[1]);
-            console.log('🔐 [MSG] 🔗 Avatar URL:', avatar.src);
+            //console.log('🔐 [MSG] 🎯 AGGRESSIVE SCAN: Found user ID in message', i, ':', match[1]);
+            //console.log('🔐 [MSG] 🔗 Avatar URL:', avatar.src);
             return match[1];
           }
         }
       }
       
-      console.log('🔐 [MSG] ❌ AGGRESSIVE SCAN: No user avatars found in', scanRange.length, 'messages');
+      //console.log('🔐 [MSG] ❌ AGGRESSIVE SCAN: No user avatars found in', scanRange.length, 'messages');
       return null;
       
     } catch (error) {

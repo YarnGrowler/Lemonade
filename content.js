@@ -10,7 +10,7 @@ class Logger {
     const logMessage = `[${timestamp}] ${message}`;
     
     // Console log only
-    console.log(logMessage, data || '');
+    // console.log(logMessage, data || '');
     
     // Show in page if needed
     if (message.includes('❌') || message.includes('ERROR')) {
@@ -55,17 +55,94 @@ class Logger {
 
 class DiscordCryptochat {
   constructor() {
-    this.isEnabled = true;
     this.encryptionKey = null;
-    this.messageObserver = null;
-    this.lastProcessedMessage = null;
     this.autoEncryptEnabled = false;
-    this.version = "2.0.0";
+    this.isEnabled = true;
+    this.isProcessingMessage = false;
+    this.scanFrequency = 1000; // Default scan frequency in ms
+    this.initialDelay = 500; // Default initial delay in ms
+    this.minScanFrequency = 500;
+    this.maxScanFrequency = 5000;
     
-    // Add method binding to ensure 'this' context
-    this.isAlreadyEncrypted = this.isAlreadyEncrypted.bind(this);
+    // Network interception for tenor URLs
+    this.tenorUrlMap = new Map(); // Maps media.tenor.com URLs to proper tenor.com/view URLs
+    this.setupNetworkInterception();
     
     this.init();
+  }
+
+  // ==================== NETWORK INTERCEPTION FOR TENOR URLS ====================
+
+  setupNetworkInterception() {
+    // console.log('🔐 [GIF] 🌐 Setting up network interception for tenor URLs...');
+    
+    // Intercept fetch requests
+    const originalFetch = window.fetch;
+    window.fetch = (...args) => {
+      const url = args[0];
+      if (typeof url === 'string' && url.includes('discord.com/api/v9/gifs/search')) {
+        // console.log('🔐 [GIF] 🎯 Intercepted Discord GIF search API call:', url);
+        
+        // Let the request proceed and intercept the response
+        return originalFetch(...args).then(response => {
+          if (response.ok) {
+            // Clone the response to read it without consuming the original
+            const clonedResponse = response.clone();
+            clonedResponse.json().then(data => {
+              if (Array.isArray(data)) {
+                this.mapTenorUrls(data);
+              }
+            }).catch(error => {
+              console.error('🔐 [GIF] ❌ Failed to parse GIF search response:', error);
+            });
+          }
+          return response;
+        });
+      }
+      return originalFetch(...args);
+    };
+
+    // Also intercept XMLHttpRequest as fallback
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+      if (typeof url === 'string' && url.includes('discord.com/api/v9/gifs/search')) {
+        // console.log('🔐 [GIF] 🎯 Intercepted XHR Discord GIF search API call:', url);
+        
+        // Store reference to track this request
+        this._isGifSearch = true;
+        
+        // Intercept the response
+        this.addEventListener('load', function() {
+          if (this._isGifSearch && this.status === 200) {
+            try {
+              const data = JSON.parse(this.responseText);
+              if (Array.isArray(data)) {
+                window.discordCryptochat?.mapTenorUrls(data);
+              }
+            } catch (error) {
+              console.error('🔐 [GIF] ❌ Failed to parse XHR GIF search response:', error);
+            }
+          }
+        });
+      }
+      return originalOpen.call(this, method, url, ...args);
+    };
+    
+    // console.log('🔐 [GIF] ✅ Network interception setup complete');
+  }
+
+  mapTenorUrls(gifData) {
+    // console.log('🔐 [GIF] 📊 Processing GIF search results:', gifData.length, 'items');
+    
+    gifData.forEach((gif, index) => {
+      if (gif.src && gif.url) {
+        // Map Discord's media URL to proper tenor URL
+        this.tenorUrlMap.set(gif.src, gif.url);
+        // console.log(`🔐 [GIF] 🗺️  Mapped [${index + 1}]:`, gif.src, '→', gif.url);
+      }
+    });
+    
+    // console.log('🔐 [GIF] ✅ Total URL mappings:', this.tenorUrlMap.size);
   }
 
   async init() {
@@ -90,7 +167,7 @@ class DiscordCryptochat {
       this.autoEncryptEnabled = result.autoEncryptEnabled || false;
       this.asymmetricEnabled = result.asymmetricEnabled || false;
       
-      console.log('🔐 [CRYPTO] Settings loaded - Auto-encrypt:', this.autoEncryptEnabled, 'Asymmetric:', this.asymmetricEnabled);
+      // console.log('🔐 [CRYPTO] Settings loaded - Auto-encrypt:', this.autoEncryptEnabled, 'Asymmetric:', this.asymmetricEnabled);
       
       if (!this.encryptionKey) {
         this.showKeyWarning();
@@ -172,14 +249,14 @@ class DiscordCryptochat {
     await this.setupIncomingMessageDecryption();
     
     // Initialize asymmetric encryption
-    console.log('🔐 [CRYPTO] Attempting to initialize asymmetric encryption...');
+    // console.log('🔐 [CRYPTO] Attempting to initialize asymmetric encryption...');
     try {
       if (typeof this.initAsymmetricEncryption === 'function') {
         this.initAsymmetricEncryption();
-        console.log('🔐 [CRYPTO] initAsymmetricEncryption() called');
+        // console.log('🔐 [CRYPTO] initAsymmetricEncryption() called');
       } else {
-        console.log('🔐 [CRYPTO] ❌ initAsymmetricEncryption method not found!');
-        console.log('🔐 [CRYPTO] Available methods:', Object.getOwnPropertyNames(this.__proto__));
+        // console.log('🔐 [CRYPTO] ❌ initAsymmetricEncryption method not found!');
+        // console.log('🔐 [CRYPTO] Available methods:', Object.getOwnPropertyNames(this.__proto__));
       }
     } catch (error) {
       console.error('🔐 [CRYPTO] ❌ Asymmetric initialization error:', error);
@@ -318,6 +395,20 @@ class DiscordCryptochat {
           sendResponse({ success: false, error: error.message });
         }
         return true;
+      } else if (request.action === 'updateAutoEncrypt') {
+        // Update auto-encrypt setting
+        this.autoEncryptEnabled = request.enabled;
+        // console.log('🔐 [GIF] 🔄 Auto-encrypt setting updated:', this.autoEncryptEnabled ? 'ENABLED' : 'DISABLED');
+        sendResponse({ success: true });
+        return true;
+      } else if (request.action === 'updateCurrentUser') {
+        // Update current user information
+        if (this.ecCrypto) {
+          await this.ecCrypto.setCurrentUser(request.userId, request.username);
+          // console.log('🔐 [EC] 👤 Current user updated:', request.username, '(ID:', request.userId + ')');
+        }
+        sendResponse({ success: true });
+        return true;
       }
     });
   }
@@ -330,6 +421,9 @@ class DiscordCryptochat {
     
     // Setup hotkeys
     this.setupHotkeys();
+    
+    // Setup GIF picker interception
+    this.setupGifPickerInterception();
     
     // Listen for keydown events on the message input with capture - very aggressive
     document.addEventListener('keydown', async (event) => {
@@ -367,7 +461,576 @@ class DiscordCryptochat {
       }
     }, true);
     
+    // Setup GIF picker interception
+    this.setupGifPickerInterception();
+  }
 
+  async setupGifPickerInterception() {
+    // console.log('🔐 [GIF] 🎬 Setting up GIF picker interception...');
+    
+    // Watch for GIF picker elements to be added to the DOM
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          // Look for GIF picker containers
+          const gifPickerContainers = [
+            ...mutation.addedNodes
+          ].filter(node => 
+            node.nodeType === Node.ELEMENT_NODE && 
+            (node.classList?.contains('content_fed6d3') || 
+             node.querySelector?.('.result__2dc39') ||
+             node.id === 'gif-picker-tab-panel')
+          );
+          
+          // Also check existing elements that might have been updated
+          if (mutation.target.classList?.contains('content_fed6d3') || 
+              mutation.target.querySelector?.('.result__2dc39')) {
+            gifPickerContainers.push(mutation.target);
+          }
+          
+          gifPickerContainers.forEach(container => {
+            this.interceptGifPickerInContainer(container);
+          });
+        }
+      }
+    });
+    
+    // Start observing the document for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Also intercept any existing GIF pickers
+    this.interceptExistingGifPickers();
+    
+    // console.log('🔐 [GIF] ✅ GIF picker interception setup complete');
+  }
+
+  interceptExistingGifPickers() {
+    // Look for existing GIF picker containers
+    const existingContainers = document.querySelectorAll('.content_fed6d3, #gif-picker-tab-panel');
+    existingContainers.forEach(container => {
+      this.interceptGifPickerInContainer(container);
+    });
+  }
+
+  interceptGifPickerInContainer(container) {
+    if (!container || container.dataset.cryptoGifIntercepted) {
+      return; // Already intercepted
+    }
+    
+    // console.log('🔐 [GIF] 🎯 Intercepting GIF picker container');
+    container.dataset.cryptoGifIntercepted = 'true';
+    
+    // Find all GIF result elements
+    const gifResults = container.querySelectorAll('.result__2dc39');
+    
+    gifResults.forEach((gifResult, index) => {
+      this.interceptGifResult(gifResult, index);
+    });
+    
+    // Set up observer for new GIF results that might be added dynamically
+    const resultObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          const newGifResults = [...mutation.addedNodes].filter(node => 
+            node.nodeType === Node.ELEMENT_NODE && 
+            node.classList?.contains('result__2dc39')
+          );
+          
+          newGifResults.forEach((gifResult, index) => {
+            this.interceptGifResult(gifResult, index);
+          });
+        }
+      }
+    });
+    
+    resultObserver.observe(container, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  interceptGifResult(gifResult, index) {
+    if (!gifResult || gifResult.dataset.cryptoIntercepted) {
+      return; // Already intercepted
+    }
+    
+    // Check if auto-encrypt is enabled
+    if (!this.autoEncryptEnabled) {
+      // console.log('🔐 [GIF] ⏸️ Auto-encrypt disabled, skipping GIF interception');
+      return;
+    }
+    
+    // Check if this is a category result (should not be intercepted)
+    const categoryElements = gifResult.querySelectorAll('[class*="category"]');
+    if (categoryElements.length > 0) {
+      // console.log('🔐 [GIF] 📂 Category result detected, skipping interception:', categoryElements.length, 'category elements found');
+      return;
+    }
+    
+    // console.log(`🔐 [GIF] 🎬 Intercepting GIF result ${index + 1}`);
+    gifResult.dataset.cryptoIntercepted = 'true';
+    
+    // Extract the tenor URL from the GIF element
+    let tenorUrl = null;
+    
+    // Method 1: Check for video source
+    const video = gifResult.querySelector('video.gif__2dc39, video');
+    if (video && video.src) {
+      // Convert Discord's proxy URL back to tenor URL
+      tenorUrl = this.extractTenorUrlFromVideo(video.src);
+    }
+    
+    // Method 2: Check for data attributes
+    if (!tenorUrl) {
+      const dataUrl = gifResult.dataset.url || gifResult.dataset.gifUrl;
+      if (dataUrl && !dataUrl.includes('/history')) {
+        tenorUrl = dataUrl;
+      }
+    }
+    
+    // Method 3: Check for links (but avoid history links)
+    if (!tenorUrl) {
+      const link = gifResult.querySelector('a[href*="tenor.com"]');
+      if (link && link.href && !link.href.includes('/history')) {
+        tenorUrl = link.href;
+      }
+    }
+    
+    // VALIDATION: Ensure we have a valid tenor URL and it's not a history link
+    if (!tenorUrl || tenorUrl.includes('/history') || !tenorUrl.includes('tenor.com')) {
+      // console.log('🔐 [GIF] ❌ Invalid or history URL, not intercepting:', tenorUrl);
+      return;
+    }
+    
+    // console.log('🔐 [GIF] 🔗 Extracted valid tenor URL:', tenorUrl);
+    
+    // Remove any existing click listeners and add our interceptor
+    const newGifResult = gifResult.cloneNode(true);
+    gifResult.parentNode.replaceChild(newGifResult, gifResult);
+    
+    newGifResult.addEventListener('click', async (event) => {
+      // console.log('🔐 [GIF] 🎯 GIF clicked! Intercepting...');
+      
+      // Prevent the default Discord behavior
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      // Show visual feedback
+      this.showGifInterceptionFeedback(newGifResult);
+      
+      try {
+        await this.handleGifSelection(tenorUrl);
+      } catch (error) {
+        console.error('🔐 [GIF] ❌ Failed to handle GIF selection:', error);
+        this.showError('Failed to send encrypted GIF');
+      }
+    }, true); // Use capture phase to intercept early
+    
+    // Also intercept any nested clickable elements
+    const clickableElements = newGifResult.querySelectorAll('video, img, div');
+    clickableElements.forEach(element => {
+      element.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
+        // console.log('🔐 [GIF] 🎯 GIF element clicked! Intercepting...');
+        this.showGifInterceptionFeedback(newGifResult);
+        
+        try {
+          await this.handleGifSelection(tenorUrl);
+        } catch (error) {
+          console.error('🔐 [GIF] ❌ Failed to handle GIF selection:', error);
+          this.showError('Failed to send encrypted GIF');
+        }
+      }, true);
+    });
+  }
+
+  extractTenorUrlFromVideo(videoSrc) {
+    // Use Discord's media.tenor.com URLs directly - they work perfectly!
+    // Example: https://media.tenor.com/bj7D0gpVJ4UAAAPo/waltergotme.mp4
+    
+    try {
+      // console.log('🔐 [GIF] 🔍 Processing video URL:', videoSrc);
+      
+      // FIRST: Block any history URLs - these are not valid GIF URLs
+      if (videoSrc.includes('/view/history') || videoSrc.includes('tenor.com/view/history')) {
+        // console.log('🔐 [GIF] 🚫 Blocking tenor history URL (not a GIF)');
+        return null;
+      }
+      
+      // NEW APPROACH: Use media.tenor.com URLs directly! 
+      // Discord handles these perfectly, no need to convert to tenor.com/view
+      const normalizedSrc = videoSrc.startsWith('//') ? `https:${videoSrc}` : videoSrc;
+      
+      // Method 1: Check if it's a media.tenor.com URL (direct use)
+      if (normalizedSrc.includes('media.tenor.com')) {
+        // console.log('🔐 [GIF] ✅ Using Discord media URL directly:', normalizedSrc);
+        return normalizedSrc;
+      }
+      
+      // Method 2: Check for Discord proxy wrapping
+      if (normalizedSrc.includes('discordapp.net/external/') && normalizedSrc.includes('media.tenor.com')) {
+        // Extract the actual media.tenor.com URL from Discord's proxy
+        const proxyMatch = normalizedSrc.match(/https?:\/\/media\.tenor\.com\/[^\/]+\/[^\/\?]+\.(mp4|gif|webm)/);
+        if (proxyMatch) {
+          // console.log('🔐 [GIF] ✅ Extracted media URL from Discord proxy:', proxyMatch[0]);
+          return proxyMatch[0];
+        }
+      }
+      
+      // Method 3: Check network mappings for other formats
+      if (this.tenorUrlMap && this.tenorUrlMap.has(normalizedSrc)) {
+        const mappedUrl = this.tenorUrlMap.get(normalizedSrc);
+        // console.log('🔐 [GIF] 🎯 Using network mapping:', normalizedSrc, '→', mappedUrl);
+        // Prefer media URLs over view URLs if available
+        if (mappedUrl.includes('media.tenor.com')) {
+          return mappedUrl;
+        }
+        return mappedUrl;
+      }
+      
+      // Method 2: Extract from Discord proxy URL patterns
+      if (videoSrc.includes('discordapp.net/external/') && videoSrc.includes('tenor.com')) {
+        const patterns = [
+          /https?:\/\/media\.tenor\.com\/([^\/]+)\/([^\/\?]+)/,  // Standard pattern with hash
+          /media\.tenor\.com\/([^\/]+)\/([^\/\?]+)/,           // Without protocol
+          /tenor\.com\/view\/([^\/\?]+)-gif-(\d+)/,            // Direct tenor view URL with proper format
+          /tenor\.com\/view\/([^\/\?]+)/                       // Tenor view URL without gif suffix
+        ];
+        
+        for (const pattern of patterns) {
+          const match = videoSrc.match(pattern);
+          if (match) {
+            // Check if this is already a proper tenor view URL
+            if (pattern.source.includes('tenor\\.com\\/view')) {
+              // console.log('🔐 [GIF] 🎯 Found existing tenor view URL:', match[0]);
+              return match[0].startsWith('http') ? match[0] : `https://${match[0]}`;
+            } else {
+              // Extract from media URL
+              const videoId = match[2] ? match[2].replace(/\.(mp4|gif|webm).*$/, '') : match[1].replace(/\.(mp4|gif|webm).*$/, '');
+              // console.log('🔐 [GIF] 🎯 Extracted video ID from proxy:', videoId);
+              
+              // Look for numeric ID in the full URL
+              const numericMatch = videoSrc.match(/(\d{15,})/);
+              if (numericMatch && videoId.length > 3) {
+                return `https://tenor.com/view/${videoId}-gif-${numericMatch[1]}`;
+              } else if (videoId.length > 3) {
+                return `https://tenor.com/view/${videoId}`;
+              }
+            }
+          }
+        }
+      }
+      
+      // Method 3: Handle existing tenor URLs (should already be correct format)
+      if (videoSrc.includes('tenor.com/view/') && !videoSrc.includes('/history')) {
+        // Extract the URL if it's already in the correct format
+        const tenorMatch = videoSrc.match(/(https?:\/\/)?tenor\.com\/view\/([^\/\?\s]+)/);
+        if (tenorMatch) {
+          const fullUrl = tenorMatch[1] ? tenorMatch[0] : `https://${tenorMatch[0]}`;
+          // console.log('🔐 [GIF] 🎯 Found existing tenor view URL:', fullUrl);
+          return fullUrl;
+        }
+      }
+      
+      // Method 4: Try to extract any very long number that might be a tenor ID (18+ digits)
+      const longNumberMatch = videoSrc.match(/(\d{18,})/);
+      if (longNumberMatch) {
+        // console.log('🔐 [GIF] 🎯 Extracted long number ID:', longNumberMatch[1]);
+        // Try to find a descriptive name in the URL for better tenor URL
+        const nameMatch = videoSrc.match(/\/([a-zA-Z][a-zA-Z0-9-]{2,})\.(mp4|gif|webm)/);
+        if (nameMatch) {
+          return `https://tenor.com/view/${nameMatch[1]}-gif-${longNumberMatch[1]}`;
+        } else {
+          return `https://tenor.com/view/gif-${longNumberMatch[1]}`;
+        }
+      }
+      
+      // console.log('🔐 [GIF] ❌ Could not extract valid tenor URL from video source');
+      // console.log('🔐 [GIF] 💡 To get proper tenor URLs:');
+      // console.log('🔐 [GIF] 💡 1. Open Discord\'s GIF picker and search for GIFs');
+      // console.log('🔐 [GIF] 💡 2. This will populate network mappings for accurate URLs');
+      // console.log('🔐 [GIF] 💡 3. Then try clicking GIFs from the picker');
+      return null;
+    } catch (error) {
+      console.error('🔐 [GIF] ❌ Failed to extract tenor URL:', error);
+      return null;
+    }
+  }
+
+  showGifInterceptionFeedback(gifElement) {
+    // Add visual feedback to show the GIF was intercepted
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(67, 181, 129, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: white;
+      z-index: 1000;
+      border-radius: 8px;
+      font-size: 14px;
+    `;
+    overlay.textContent = '🔐 Encrypting...';
+    
+    gifElement.style.position = 'relative';
+    gifElement.appendChild(overlay);
+    
+    // Remove the overlay after a delay
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    }, 1500);
+  }
+
+  async handleGifSelection(tenorUrl) {
+    // console.log('🔐 [GIF] 📤 Processing GIF selection:', tenorUrl);
+    
+    // Updated validation - accept both media.tenor.com and tenor.com/view URLs
+    if (!tenorUrl || tenorUrl.includes('/history') || 
+        (!tenorUrl.includes('media.tenor.com') && !tenorUrl.includes('tenor.com/view/'))) {
+      // console.log('🔐 [GIF] ❌ Invalid tenor URL, not processing:', tenorUrl);
+      return;
+    }
+    
+    // Close the GIF picker first
+    this.closeGifPicker();
+    
+    // Find the message input box
+    const messageBox = this.findMessageInputBox();
+    if (!messageBox) {
+      console.error('🔐 [GIF] ❌ Could not find message input box');
+      return;
+    }
+    
+    // KEEP MP4 URL - they load better than converted GIF URLs
+    // console.log('🔐 [GIF] 🔐 Encrypting MP4 URL (will render as video):', tenorUrl);
+    
+    let encryptedMessage = null;
+    let encryptionMethod = 'none';
+    
+    // Try asymmetric encryption first
+    if (this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+      try {
+        // console.log('🔐 [GIF] 🔐 Trying asymmetric encryption...');
+                 const asymmetricResult = await this.encryptAsymmetricMessage(tenorUrl);
+        if (asymmetricResult && asymmetricResult.success) {
+          encryptedMessage = asymmetricResult.encryptedText;
+          encryptionMethod = 'asymmetric';
+          // console.log('🔐 [GIF] ✅ Asymmetric encryption success - length:', encryptedMessage.length);
+        } else {
+          // console.log('🔐 [GIF] ❌ Asymmetric encryption failed, trying symmetric...');
+        }
+      } catch (error) {
+        // console.log('🔐 [GIF] ❌ Asymmetric encryption error:', error.message);
+      }
+    }
+    
+    // Fallback to symmetric encryption if asymmetric failed
+    if (!encryptedMessage && this.encryptionKey) {
+      try {
+        // console.log('🔐 [GIF] 🔐 Trying symmetric encryption...');
+        const discordCrypto = new DiscordCrypto();
+                 const symmetricResult = await discordCrypto.encrypt(tenorUrl, this.encryptionKey);
+        if (symmetricResult) {
+          encryptedMessage = this.encodeStealthMessage(symmetricResult);
+          encryptionMethod = 'symmetric';
+          // console.log('🔐 [GIF] ✅ Symmetric encryption success - length:', encryptedMessage.length);
+        }
+      } catch (error) {
+        // console.log('🔐 [GIF] ❌ Symmetric encryption error:', error.message);
+      }
+    }
+    
+    // If no encryption worked, show error
+    if (!encryptedMessage) {
+      // console.log('🔐 [GIF] ❌ No encryption method available or all failed');
+      this.showError('Unable to encrypt GIF - no encryption key available');
+      return;
+    }
+    
+    // console.log('🔐 [GIF] ✅ Encrypted GIF URL using:', encryptionMethod);
+    
+    // Insert the encrypted message
+    await this.insertMessageContent(messageBox, encryptedMessage);
+    
+    // Wait a bit longer to ensure content is properly inserted
+    setTimeout(() => {
+      this.sendMessage(messageBox);
+    }, 250);
+    
+    // console.log('🔐 [GIF] ✅ Encrypted GIF sent successfully');
+  }
+
+  closeGifPicker() {
+    // Try multiple methods to close the GIF picker
+    
+    // Method 1: Click the back button
+    const backButton = document.querySelector('.backButton_fed6d3');
+    if (backButton) {
+      // console.log('🔐 [GIF] ⬅️ Closing GIF picker with back button');
+      backButton.click();
+      return;
+    }
+    
+    // Method 2: Press Escape key
+    const escapeEvent = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      code: 'Escape',
+      keyCode: 27,
+      bubbles: true,
+      cancelable: true
+    });
+    document.dispatchEvent(escapeEvent);
+    
+    // Method 3: Click outside the picker (find the overlay)
+    const overlay = document.querySelector('[class*="layer"]');
+    if (overlay) {
+      overlay.click();
+    }
+    
+    // console.log('🔐 [GIF] ❌ GIF picker close attempted');
+  }
+
+  findMessageInputBox() {
+    const selectors = [
+      '[data-slate-editor="true"]',
+      '[role="textbox"]',
+      'div[contenteditable="true"]',
+      '.message-text-area textarea',
+      '.message-text-area div[contenteditable]'
+    ];
+    
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        // console.log('🔐 [GIF] 📝 Found message input with selector:', selector);
+        return element;
+      }
+    }
+    
+    // console.log('🔐 [GIF] ❌ Could not find message input box');
+    return null;
+  }
+
+  clearMessageBox(messageBox) {
+    // Clear the message box content
+    if (messageBox.hasAttribute('contenteditable')) {
+      messageBox.innerHTML = '';
+      messageBox.textContent = '';
+    } else if (messageBox.value !== undefined) {
+      messageBox.value = '';
+    }
+    
+    // Trigger input events to notify Discord
+    messageBox.dispatchEvent(new Event('input', { bubbles: true }));
+    messageBox.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  async insertMessageContent(messageBox, content) {
+    // console.log('🔐 [GIF] 📝 Inserting content using EXACT SAME METHOD as text encryption:', content);
+    
+    // Use the EXACT SAME clipboard method as handleOutgoingMessage to prevent corruption
+    try {
+      // Focus the message box
+      messageBox.focus();
+      
+      // Store original clipboard content to restore later
+      let originalClipboard = '';
+      try {
+        originalClipboard = await navigator.clipboard.readText();
+      } catch (e) {
+        // Clipboard access might be denied, that's ok
+      }
+      
+      // Copy content to clipboard
+      await navigator.clipboard.writeText(content);
+      
+      // Select all current text
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(messageBox);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Paste the content (Ctrl+V simulation) - EXACT SAME as handleOutgoingMessage
+      const pasteEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: new DataTransfer()
+      });
+      
+      // Add the content to clipboard data
+      pasteEvent.clipboardData.setData('text/plain', content);
+      
+      messageBox.dispatchEvent(pasteEvent);
+      
+      // Also try execCommand as fallback
+      document.execCommand('paste');
+      
+      // Restore original clipboard if we had one
+      if (originalClipboard) {
+        setTimeout(() => {
+          navigator.clipboard.writeText(originalClipboard);
+        }, 1000);
+      }
+      
+      // console.log('🔐 [GIF] ✅ Content inserted via clipboard method (identical to text encryption)');
+      
+    } catch (error) {
+      console.error('🔐 [GIF] ❌ Failed to insert content:', error);
+      throw error;
+    }
+  }
+
+  sendMessage(messageBox) {
+    // Try multiple methods to send the message
+    
+    // Method 1: Find and click the send button
+    const sendSelectors = [
+      'button[aria-label="Send Message"]:not([disabled])',
+      'button[aria-label*="Send Message"]:not([disabled])',
+      'button:has(.sendIcon_aa63ab):not([disabled])',
+      '[data-list-item-id="send-message-button"]:not([disabled])'
+    ];
+    
+    for (const selector of sendSelectors) {
+      const sendButton = document.querySelector(selector);
+      if (sendButton) {
+        // console.log('🔐 [GIF] 📤 Sending message with button:', selector);
+        sendButton.click();
+        return;
+      }
+    }
+    
+    // Method 2: Simulate Enter key press
+    const enterEvent = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      bubbles: true,
+      cancelable: true
+    });
+    
+    messageBox.dispatchEvent(enterEvent);
+    
+    // console.log('🔐 [GIF] 📤 Message send attempted with Enter key');
   }
 
   setupHotkeys() {
@@ -470,7 +1133,7 @@ class DiscordCryptochat {
     
     // Method 2: Fallback to textContent
     if (!messageText) {
-      messageText = messageBox.textContent?.trim() || '';
+    messageText = messageBox.textContent?.trim() || '';
     }
     
     // Method 3: Fallback to innerText
@@ -487,11 +1150,22 @@ class DiscordCryptochat {
     }
     
     // Determine if we should encrypt this message
-    const shouldEncrypt = this.autoEncryptEnabled || messageText.startsWith('!priv ');
+    const isTenorUrl = messageText.includes('media.tenor.com') || messageText.includes('tenor.com/view/');
+    const shouldEncrypt = this.autoEncryptEnabled || messageText.startsWith('!priv ') || isTenorUrl;
+    
+    // DEBUG: Log the detection logic
+    // console.log('🔐 [DEBUG] Message text:', messageText);
+    // console.log('🔐 [DEBUG] Auto-encrypt enabled:', this.autoEncryptEnabled);
+    // console.log('🔐 [DEBUG] Starts with !priv:', messageText.startsWith('!priv '));
+    // console.log('🔐 [DEBUG] Is tenor URL:', isTenorUrl);
+    // console.log('🔐 [DEBUG] Should encrypt:', shouldEncrypt);
     
     if (!shouldEncrypt) {
+      // console.log('🔐 [DEBUG] Not encrypting - letting Discord handle normally');
       return; // Not a message to encrypt, let Discord handle it normally
     }
+    
+    // console.log('🔐 [DEBUG] ✅ Proceeding with encryption...');
 
     // Check if it's already encrypted (avoid double processing)
     try {
@@ -961,21 +1635,32 @@ class DiscordCryptochat {
 
 
   async processLinksAndGifs(text) {
+    // First check if this is a large emoji message (1-3 emojis only)
+    if (this.isLargeEmojiMessage(text)) {
+      console.log('🎨 [RENDER] 😀 Large emoji message detected');
+      return [this.createLargeEmojiElement(text)];
+    }
+    
     const elements = [];
     const parts = text.split(/(\s+)/); // Split by whitespace but keep the whitespace
     
     for (const part of parts) {
       if (this.isUrl(part)) {
+        // console.log('🎨 [RENDER] Processing URL:', part);
+        
         if (this.isDirectImageUrl(part)) {
           // Direct image URL - embed immediately
+          // console.log('🎨 [RENDER] → Direct image URL, creating embed');
           const mediaContainer = this.createDirectImageEmbed(part);
           elements.push(mediaContainer);
         } else if (this.isSocialMediaUrl(part)) {
           // Social media URL - fetch metadata and create rich embed
+          // console.log('🎨 [RENDER] → Social media URL, creating rich embed');
           const richEmbed = await this.createRichMediaEmbed(part);
           elements.push(richEmbed);
         } else {
           // Regular link
+          // console.log('🎨 [RENDER] → Regular link');
           elements.push(this.createLink(part));
         }
       } else {
@@ -988,6 +1673,44 @@ class DiscordCryptochat {
     return elements;
   }
 
+  isLargeEmojiMessage(text) {
+    // Remove whitespace and check if message contains only emojis
+    const trimmed = text.trim();
+    
+    // Regex to match emoji characters (including compound emojis)
+    const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
+    const emojiMatches = trimmed.match(emojiRegex);
+    
+    if (!emojiMatches) return false;
+    
+    // Check if the message contains only emojis (1-3 emojis)
+    const emojiCount = emojiMatches.length;
+    if (emojiCount > 3 || emojiCount === 0) return false;
+    
+    // Remove all emojis and check if anything substantial remains
+    const withoutEmojis = trimmed.replace(emojiRegex, '').trim();
+    
+    // Allow for very minimal text like spaces or simple punctuation
+    return withoutEmojis.length <= 2;
+  }
+
+  createLargeEmojiElement(text) {
+    const container = document.createElement('div');
+    container.style.cssText = `
+      font-size: 48px;
+      line-height: 1.2;
+      margin: 8px 0;
+      text-align: left;
+    `;
+    
+    // Clean up the text but preserve emojis
+    const cleanText = text.trim();
+    container.textContent = cleanText;
+    
+    console.log('🎨 [RENDER] ✨ Created large emoji element:', cleanText);
+    return container;
+  }
+
   createDirectImageEmbed(url) {
     const container = document.createElement('div');
     container.style.cssText = `
@@ -996,27 +1719,133 @@ class DiscordCryptochat {
       overflow: hidden;
       background: #2f3136;
       border: 1px solid #40444b;
-      max-width: 400px;
+      max-width: min(400px, 80vw);
+      display: inline-block;
     `;
 
+    // Check if this is a media.tenor.com MP4 video
+    if (url.includes('media.tenor.com') && url.includes('.mp4')) {
+      console.log('🎨 [RENDER] 🎬 Creating video element for Tenor MP4:', url);
+      
+      const video = document.createElement('video');
+      video.src = url;
+      video.style.cssText = `
+        display: block;
+        cursor: pointer;
+        max-width: 100%;
+        max-height: 300px;
+        width: auto;
+        height: auto;
+      `;
+      
+      // Make it behave like a GIF
+      video.autoplay = true;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      
+      // Add click handler for popup modal
+      video.addEventListener('click', () => {
+        this.showGifModal(url, 'video');
+      });
+      
+      video.onloadeddata = () => {
+        console.log('🎨 [RENDER] ✅ Video loaded successfully:', url);
+        // Resize container to fit video dimensions
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        if (videoWidth && videoHeight) {
+          const aspectRatio = videoWidth / videoHeight;
+          const maxWidth = Math.min(400, window.innerWidth * 0.8);
+          const maxHeight = 300;
+          
+          let finalWidth = videoWidth;
+          let finalHeight = videoHeight;
+          
+          // Scale down if too large
+          if (finalWidth > maxWidth) {
+            finalWidth = maxWidth;
+            finalHeight = maxWidth / aspectRatio;
+          }
+          if (finalHeight > maxHeight) {
+            finalHeight = maxHeight;
+            finalWidth = maxHeight * aspectRatio;
+          }
+          
+          video.style.width = finalWidth + 'px';
+          video.style.height = finalHeight + 'px';
+          container.style.width = finalWidth + 'px';
+          container.style.height = finalHeight + 'px';
+        }
+      };
+      
+      video.onerror = (error) => {
+        console.log('🎨 [RENDER] ❌ Video failed to load:', url, error);
+        
+        // Fallback to styled link
+        const link = this.createTenorStyleLink(url);
+        container.innerHTML = '';
+        container.appendChild(link);
+        container.style.padding = '8px';
+      };
+      
+      container.appendChild(video);
+      return container;
+    }
+
+    // For regular images
     const img = document.createElement('img');
     img.src = url;
     img.style.cssText = `
-      width: 100%;
-      height: auto;
-      max-width: 400px;
-      max-height: 300px;
       display: block;
       cursor: pointer;
-      object-fit: contain;
+      max-width: 100%;
+      max-height: 300px;
+      width: auto;
+      height: auto;
     `;
     
+    // Add click handler for popup modal
     img.addEventListener('click', () => {
-      window.open(url, '_blank');
+      this.showGifModal(url, 'image');
     });
     
-    img.onerror = () => {
-      // If image fails to load, show as link instead
+    img.onload = () => {
+      console.log('🎨 [RENDER] ✅ Image loaded successfully:', url);
+      // Resize container to fit image dimensions  
+      const imgWidth = img.naturalWidth;
+      const imgHeight = img.naturalHeight;
+      
+      if (imgWidth && imgHeight) {
+        const aspectRatio = imgWidth / imgHeight;
+        const maxWidth = Math.min(400, window.innerWidth * 0.8);
+        const maxHeight = 300;
+        
+        let finalWidth = imgWidth;
+        let finalHeight = imgHeight;
+        
+        // Scale down if too large
+        if (finalWidth > maxWidth) {
+          finalWidth = maxWidth;
+          finalHeight = maxWidth / aspectRatio;
+        }
+        if (finalHeight > maxHeight) {
+          finalHeight = maxHeight;
+          finalWidth = maxHeight * aspectRatio;
+        }
+        
+        img.style.width = finalWidth + 'px';
+        img.style.height = finalHeight + 'px';
+        container.style.width = finalWidth + 'px';
+        container.style.height = finalHeight + 'px';
+      }
+    };
+    
+    img.onerror = (error) => {
+      console.log('🎨 [RENDER] ❌ Image failed to load:', url, error);
+      
+      // Fallback to regular link
       const link = this.createLink(url);
       container.innerHTML = '';
       container.appendChild(link);
@@ -1024,6 +1853,190 @@ class DiscordCryptochat {
     };
     
     container.appendChild(img);
+    return container;
+  }
+
+  showGifModal(url, type = 'image') {
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      cursor: pointer;
+      animation: fadeIn 0.2s ease-out;
+    `;
+
+    // Add CSS animation
+    if (!document.getElementById('gif-modal-styles')) {
+      const style = document.createElement('style');
+      style.id = 'gif-modal-styles';
+      style.textContent = `
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes zoomIn {
+          from { transform: scale(0.8); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Create media container
+    const mediaContainer = document.createElement('div');
+    mediaContainer.style.cssText = `
+      max-width: 90vw;
+      max-height: 90vh;
+      position: relative;
+      animation: zoomIn 0.3s ease-out;
+      cursor: default;
+    `;
+
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.innerHTML = '✕';
+    closeButton.style.cssText = `
+      position: absolute;
+      top: -40px;
+      right: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      font-size: 24px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    `;
+
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.background = 'rgba(255, 255, 255, 0.3)';
+    });
+
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.background = 'rgba(255, 255, 255, 0.2)';
+    });
+
+    closeButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modal.remove();
+    });
+
+    // Create the media element
+    let mediaElement;
+    if (type === 'video' || url.includes('.mp4')) {
+      mediaElement = document.createElement('video');
+      mediaElement.src = url;
+      mediaElement.autoplay = true;
+      mediaElement.loop = true;
+      mediaElement.muted = true;
+      mediaElement.controls = true; // Show controls in modal
+      mediaElement.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      `;
+    } else {
+      mediaElement = document.createElement('img');
+      mediaElement.src = url;
+      mediaElement.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      `;
+    }
+
+    // Prevent media element from closing modal when clicked
+    mediaElement.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Close modal when clicking backdrop
+    modal.addEventListener('click', () => {
+      modal.remove();
+    });
+
+    // Close modal with Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Assemble modal
+    mediaContainer.appendChild(mediaElement);
+    mediaContainer.appendChild(closeButton);
+    modal.appendChild(mediaContainer);
+    document.body.appendChild(modal);
+
+    // Clean up event listener when modal is removed
+    modal.addEventListener('remove', () => {
+      document.removeEventListener('keydown', handleEscape);
+    });
+
+    // console.log('🎨 [MODAL] 🖼️ GIF modal opened for:', url);
+  }
+
+  createTenorStyleLink(url) {
+    // Create a GIF-style preview for Tenor URLs that can't load directly
+    const container = document.createElement('div');
+    container.style.cssText = `
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #7289da, #5865f2);
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      margin: 4px 0;
+      transition: all 0.2s ease;
+      border: 2px solid #4f5660;
+    `;
+    
+    container.innerHTML = `
+      <div style="font-size: 24px; margin-right: 12px;">🎬</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 600; margin-bottom: 2px;">Tenor GIF</div>
+        <div style="font-size: 12px; opacity: 0.8;">Click to view animated GIF</div>
+      </div>
+      <div style="font-size: 18px;">▶️</div>
+    `;
+    
+    container.addEventListener('click', () => {
+      window.open(url, '_blank');
+    });
+    
+    container.addEventListener('mouseenter', () => {
+      container.style.transform = 'scale(1.02)';
+      container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+    });
+    
+    container.addEventListener('mouseleave', () => {
+      container.style.transform = 'scale(1)';
+      container.style.boxShadow = 'none';
+    });
+    
     return container;
   }
 
@@ -1251,7 +2264,23 @@ class DiscordCryptochat {
     try {
       // Tenor patterns
       if (url.includes('tenor.com')) {
-        // Pattern 1: tenor.com/view/name-ID
+        // Pattern 1: media.tenor.com direct URLs (used by Discord)
+        if (url.includes('media.tenor.com')) {
+          // Extract the file ID from the URL
+          const match = url.match(/media\.tenor\.com\/([^\/]+)/);
+          if (match) {
+            // Convert .mp4 to .gif for rendering, preserve the original URL structure
+            const gifUrl = url.replace(/\.mp4(\?.*)?$/, '.gif$1');
+            return {
+              title: 'Tenor GIF',
+              image: gifUrl, // Use the GIF version for display
+              siteName: 'Tenor',
+              url: url // Keep original URL for click-through
+            };
+          }
+        }
+        
+        // Pattern 2: tenor.com/view/name-ID
         let match = url.match(/tenor\.com\/view\/([^\/]*)-(\d+)/);
         if (match) {
           return {
@@ -1262,7 +2291,7 @@ class DiscordCryptochat {
           };
         }
         
-        // Pattern 2: Any long number in Tenor URL
+        // Pattern 3: Any long number in Tenor URL
         match = url.match(/(\d{10,})/);
         if (match) {
           return {
@@ -1317,7 +2346,7 @@ class DiscordCryptochat {
     
     // Special handling for different site types
     if (originalUrl.includes('tenor.com')) {
-      // Tenor: Only show the GIF, no metadata
+      // Tenor: Only show the GIF, no metadata (handles both tenor.com and media.tenor.com)
       this.renderTenorGif(container, originalUrl, metadata);
     } else if (originalUrl.includes('youtube.com') || originalUrl.includes('youtu.be')) {
       // YouTube: Show thumbnail with play button
@@ -1554,12 +2583,18 @@ class DiscordCryptochat {
   }
 
   isDirectImageUrl(url) {
-    return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+    // Check for direct image extensions
+    const isImageExtension = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+    // Also treat media.tenor.com MP4s as direct media (will render as video)
+    const isMediaTenorVideo = url.includes('media.tenor.com') && (url.includes('.mp4') || url.includes('.gif'));
+    
+    return isImageExtension || isMediaTenorVideo;
   }
 
   isSocialMediaUrl(url) {
     const socialDomains = [
       'tenor.com',
+      'media.tenor.com',
       'giphy.com',
       'youtube.com',
       'youtu.be',
@@ -1905,7 +2940,7 @@ class DiscordCryptochat {
 
   // Initialize asymmetric encryption system
   async initAsymmetricEncryption() {
-    console.log('🔐 [ASYMMETRIC] Initializing asymmetric encryption system...');
+    // console.log('🔐 [ASYMMETRIC] Initializing asymmetric encryption system...');
     
     const maxRetries = 10;
     let retryCount = 0;
@@ -1913,16 +2948,16 @@ class DiscordCryptochat {
     const attemptInit = async () => {
       try {
         retryCount++;
-        console.log(`🔐 [ASYMMETRIC] Attempt ${retryCount}/${maxRetries}...`);
+        // console.log(`🔐 [ASYMMETRIC] Attempt ${retryCount}/${maxRetries}...`);
         
         // Check if all required classes are available
         if (typeof AsymmetricContentIntegration === 'undefined') {
-          console.log('🔐 [ASYMMETRIC] ❌ AsymmetricContentIntegration class not found');
+          // console.log('🔐 [ASYMMETRIC] ❌ AsymmetricContentIntegration class not found');
           if (retryCount < maxRetries) {
             setTimeout(attemptInit, 500);
             return;
           } else {
-            console.log('🔐 [ASYMMETRIC] ❌ Max retries reached - AsymmetricContentIntegration not available');
+            // console.log('🔐 [ASYMMETRIC] ❌ Max retries reached - AsymmetricContentIntegration not available');
             return;
           }
         }
@@ -1940,11 +2975,11 @@ class DiscordCryptochat {
         }
         
         // Initialize asymmetric content integration
-        console.log('🔐 [ASYMMETRIC] 🚀 Creating AsymmetricContentIntegration...');
+        // console.log('🔐 [ASYMMETRIC] 🚀 Creating AsymmetricContentIntegration...');
         this.asymmetric = new AsymmetricContentIntegration(this);
         
         // Wait for initialization
-        console.log('🔐 [ASYMMETRIC] ⏳ Initializing...');
+        // console.log('🔐 [ASYMMETRIC] ⏳ Initializing...');
         const success = await this.asymmetric.initialize();
         
         if (success && this.asymmetric.isInitialized) {
@@ -1952,9 +2987,9 @@ class DiscordCryptochat {
           this.processAsymmetricMessage = this.asymmetric.processIncomingMessage.bind(this.asymmetric);
           this.encryptAsymmetricMessage = this.asymmetric.encryptOutgoingMessage.bind(this.asymmetric);
           
-          console.log('🔐 [ASYMMETRIC] ✅ Asymmetric encryption fully initialized!');
-          console.log('🔐 [ASYMMETRIC] processAsymmetricMessage available:', typeof this.processAsymmetricMessage);
-          console.log('🔐 [ASYMMETRIC] encryptAsymmetricMessage available:', typeof this.encryptAsymmetricMessage);
+          // console.log('🔐 [ASYMMETRIC] ✅ Asymmetric encryption fully initialized!');
+          // console.log('🔐 [ASYMMETRIC] processAsymmetricMessage available:', typeof this.processAsymmetricMessage);
+          // console.log('🔐 [ASYMMETRIC] encryptAsymmetricMessage available:', typeof this.encryptAsymmetricMessage);
           
           // Show success notification
           Logger.showPageNotification('🔐 Asymmetric encryption ready!', 'success');
@@ -1978,68 +3013,68 @@ class DiscordCryptochat {
   }
 
   debugAsymmetricStatus() {
-    console.log('🔐 [DEBUG] === ASYMMETRIC STATUS DEBUG ===');
-    console.log('🔐 [DEBUG] Settings - Asymmetric enabled:', this.asymmetricEnabled);
-    console.log('🔐 [DEBUG] Has asymmetric object:', !!this.asymmetric);
-    console.log('🔐 [DEBUG] Extension version:', this.version);
-    console.log('🔐 [DEBUG] Has initAsymmetricEncryption method:', typeof this.initAsymmetricEncryption);
+    // console.log('🔐 [DEBUG] === ASYMMETRIC STATUS DEBUG ===');
+    // console.log('🔐 [DEBUG] Settings - Asymmetric enabled:', this.asymmetricEnabled);
+    // console.log('🔐 [DEBUG] Has asymmetric object:', !!this.asymmetric);
+    // console.log('🔐 [DEBUG] Extension version:', this.version);
+    // console.log('🔐 [DEBUG] Has initAsymmetricEncryption method:', typeof this.initAsymmetricEncryption);
     
     if (this.asymmetric) {
-      console.log('🔐 [DEBUG] Asymmetric initialized:', this.asymmetric.isInitialized);
-      console.log('🔐 [DEBUG] Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
-      console.log('🔐 [DEBUG] Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
+      // console.log('🔐 [DEBUG] Asymmetric initialized:', this.asymmetric.isInitialized);
+      // console.log('🔐 [DEBUG] Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
+      // console.log('🔐 [DEBUG] Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
       
       if (this.asymmetric.isInitialized) {
         const status = this.asymmetric.getAsymmetricStatus();
-        console.log('🔐 [DEBUG] Asymmetric status:', status);
+        // console.log('🔐 [DEBUG] Asymmetric status:', status);
         
         // Try to get contact list
         try {
           const contacts = this.asymmetric.getContactList();
-          console.log('🔐 [DEBUG] Contact count:', contacts.length);
+          // console.log('🔐 [DEBUG] Contact count:', contacts.length);
           if (contacts.length > 0) {
-            console.log('🔐 [DEBUG] First contact:', contacts[0]);
+            // console.log('🔐 [DEBUG] First contact:', contacts[0]);
           }
         } catch (error) {
-          console.log('🔐 [DEBUG] Error getting contacts:', error);
+           // console.log('🔐 [DEBUG] Error getting contacts:', error);
         }
       }
     } else {
-      console.log('🔐 [DEBUG] Asymmetric object not created - trying to reinitialize...');
+      // console.log('🔐 [DEBUG] Asymmetric object not created - trying to reinitialize...');
       
       // Try to force reinitialize if methods are available but object isn't created
       if (typeof this.initAsymmetricEncryption === 'function') {
-        console.log('🔐 [DEBUG] Retrying initAsymmetricEncryption...');
+        // console.log('🔐 [DEBUG] Retrying initAsymmetricEncryption...');
         try {
           this.initAsymmetricEncryption();
           
           // Check again after a delay
           setTimeout(() => {
-            console.log('🔐 [DEBUG] After retry - Has asymmetric object:', !!this.asymmetric);
-            console.log('🔐 [DEBUG] After retry - Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
-            console.log('🔐 [DEBUG] After retry - Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
+            // console.log('🔐 [DEBUG] After retry - Has asymmetric object:', !!this.asymmetric);
+            // console.log('🔐 [DEBUG] After retry - Has processAsymmetricMessage:', typeof this.processAsymmetricMessage);
+            // console.log('🔐 [DEBUG] After retry - Has encryptAsymmetricMessage:', typeof this.encryptAsymmetricMessage);
           }, 1000);
         } catch (error) {
-          console.log('🔐 [DEBUG] Retry failed:', error);
+          // console.log('🔐 [DEBUG] Retry failed:', error);
         }
       }
     }
     
     // Check if global objects exist
-    console.log('🔐 [DEBUG] Global ecCrypto exists:', typeof window.ecCrypto);
-    console.log('🔐 [DEBUG] Global ecMessageProcessor exists:', typeof window.ecMessageProcessor);
-    console.log('🔐 [DEBUG] Global ECMessageProcessor exists:', typeof ECMessageProcessor);
-    console.log('🔐 [DEBUG] Global AsymmetricContentIntegration exists:', typeof AsymmetricContentIntegration);
+    // console.log('🔐 [DEBUG] Global ecCrypto exists:', typeof window.ecCrypto);
+    // console.log('🔐 [DEBUG] Global ecMessageProcessor exists:', typeof window.ecMessageProcessor);
+    // console.log('🔐 [DEBUG] Global ECMessageProcessor exists:', typeof ECMessageProcessor);
+    // console.log('🔐 [DEBUG] Global AsymmetricContentIntegration exists:', typeof AsymmetricContentIntegration);
     
-    console.log('🔐 [DEBUG] ================================');
+    // console.log('🔐 [DEBUG] ================================');
   }
 
   // Manual test method - call from console: discordCryptochat.testAsymmetricEncryption()
   async testAsymmetricEncryption() {
-    console.log('🔐 [TEST] Testing asymmetric encryption...');
+    // console.log('🔐 [TEST] Testing asymmetric encryption...');
     
     if (!this.asymmetric || !this.asymmetric.isInitialized) {
-      console.log('🔐 [TEST] Asymmetric not initialized - calling init...');
+      // console.log('🔐 [TEST] Asymmetric not initialized - calling init...');
       this.initAsymmetricEncryption();
       
       // Wait a moment for init
@@ -2052,11 +3087,11 @@ class DiscordCryptochat {
     if (this.encryptAsymmetricMessage) {
       try {
         const testMessage = "Hello asymmetric world!";
-        console.log('🔐 [TEST] Encrypting test message:', testMessage);
+        // console.log('🔐 [TEST] Encrypting test message:', testMessage);
         const result = await this.encryptAsymmetricMessage(testMessage);
-        console.log('🔐 [TEST] Encryption result:', result);
+        // console.log('🔐 [TEST] Encryption result:', result);
       } catch (error) {
-        console.log('🔐 [TEST] Encryption failed:', error);
+        // console.log('🔐 [TEST] Encryption failed:', error);
       }
     }
   }
@@ -2177,10 +3212,10 @@ class DiscordCryptochat {
 
   async handleGetCurrentKeyInfo(sendResponse) {
     try {
-      console.log('🔐 [HANDLER] Getting current key info...');
+      // console.log('🔐 [HANDLER] Getting current key info...');
       
       if (!window.ecCrypto) {
-        console.log('🔐 [HANDLER] ❌ EC crypto not available');
+        // console.log('🔐 [HANDLER] ❌ EC crypto not available');
         sendResponse({ success: false, error: 'EC crypto not available' });
         return;
       }
@@ -2222,15 +3257,15 @@ class DiscordCryptochat {
         }
         
       } catch (storageError) {
-        console.log('🔐 [HANDLER] ⚠️ Could not get storage info:', storageError);
+      //  console.log('🔐 [HANDLER] ⚠️ Could not get storage info:', storageError);
       }
       
-      console.log('🔐 [HANDLER] ✅ Key info retrieved:', {
-        keyId: keyInfo.keyId,
-        publicKeyLength: keyInfo.publicKey ? keyInfo.publicKey.length : 0,
-        created: keyInfo.created ? new Date(keyInfo.created).toLocaleString() : 'Unknown',
-        nextRotation: keyInfo.nextRotation ? new Date(keyInfo.nextRotation).toLocaleString() : 'N/A'
-      });
+    //  console.log('🔐 [HANDLER] ✅ Key info retrieved:', {
+      //   keyId: keyInfo.keyId,
+      //   publicKeyLength: keyInfo.publicKey ? keyInfo.publicKey.length : 0,
+      //   created: keyInfo.created ? new Date(keyInfo.created).toLocaleString() : 'Unknown',
+      //   nextRotation: keyInfo.nextRotation ? new Date(keyInfo.nextRotation).toLocaleString() : 'N/A'
+      // });
       
       sendResponse({
         success: true,
@@ -2400,10 +3435,10 @@ class DiscordCryptochat {
 
   async handleRotateECKeys(source, sendResponse) {
     try {
-      console.log(`🔐 [CONTENT] 🔑 EC key rotation triggered by: ${source}`);
+      // console.log(`🔐 [CONTENT] 🔑 EC key rotation triggered by: ${source}`);
       
       if (!window.ecCrypto) {
-        console.log('🔐 [CONTENT] 🔑 EC crypto not available');
+        // console.log('🔐 [CONTENT] 🔑 EC crypto not available');
         sendResponse({ success: false, error: 'EC crypto not available' });
         return;
       }
@@ -2411,11 +3446,11 @@ class DiscordCryptochat {
       // Perform the rotation
       await window.ecCrypto.rotateKeysNow();
       
-      console.log('🔐 [CONTENT] 🔑 ✅ EC key rotation completed successfully');
+      // console.log('🔐 [CONTENT] 🔑 ✅ EC key rotation completed successfully');
       sendResponse({ success: true, source: source });
       
     } catch (error) {
-      console.error('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
+      // console.error('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
       sendResponse({ success: false, error: error.message, source: source });
     }
   }
@@ -2426,34 +3461,34 @@ const discordCryptochat = new DiscordCryptochat();
 
 // Global function for manual asymmetric initialization (for debugging)
 window.forceAsymmetricInit = function() {
-  console.log('🔐 [MANUAL] Forcing asymmetric initialization...');
-  console.log('🔐 [MANUAL] DiscordCryptochat available:', typeof DiscordCryptochat);
-  console.log('🔐 [MANUAL] AsymmetricContentIntegration available:', typeof AsymmetricContentIntegration);
-  console.log('🔐 [MANUAL] ecCrypto available:', typeof ecCrypto);
-  console.log('🔐 [MANUAL] ecMessageProcessor available:', typeof ecMessageProcessor);
+  // console.log('🔐 [MANUAL] Forcing asymmetric initialization...');
+  // console.log('🔐 [MANUAL] DiscordCryptochat available:', typeof DiscordCryptochat);
+  // console.log('🔐 [MANUAL] AsymmetricContentIntegration available:', typeof AsymmetricContentIntegration);
+  // console.log('🔐 [MANUAL] ecCrypto available:', typeof ecCrypto);
+  // console.log('🔐 [MANUAL] ecMessageProcessor available:', typeof ecMessageProcessor);
   
   if (discordCryptochat && typeof discordCryptochat.initAsymmetricEncryption === 'function') {
     discordCryptochat.initAsymmetricEncryption();
-    console.log('🔐 [MANUAL] Called initAsymmetricEncryption');
+    // console.log('🔐 [MANUAL] Called initAsymmetricEncryption');
     
     setTimeout(() => {
-      console.log('🔐 [MANUAL] Results after 2s:');
-      console.log('🔐 [MANUAL] Has asymmetric object:', !!discordCryptochat.asymmetric);
-      console.log('🔐 [MANUAL] Has processAsymmetricMessage:', typeof discordCryptochat.processAsymmetricMessage);
-      console.log('🔐 [MANUAL] Has encryptAsymmetricMessage:', typeof discordCryptochat.encryptAsymmetricMessage);
+      // console.log('🔐 [MANUAL] Results after 2s:');
+      // console.log('🔐 [MANUAL] Has asymmetric object:', !!discordCryptochat.asymmetric);
+      // console.log('🔐 [MANUAL] Has processAsymmetricMessage:', typeof discordCryptochat.processAsymmetricMessage);
+      // console.log('🔐 [MANUAL] Has encryptAsymmetricMessage:', typeof discordCryptochat.encryptAsymmetricMessage);
     }, 2000);
   } else {
-    console.log('🔐 [MANUAL] ❌ initAsymmetricEncryption not available');
+    // console.log('🔐 [MANUAL] ❌ initAsymmetricEncryption not available');
   }
 };
 
 // Global debug function to check key status after rotation
 window.debugKeyStatus = function() {
-  console.log('🔐 [DEBUG] === KEY STATUS DEBUG ===');
+  // console.log('🔐 [DEBUG] === KEY STATUS DEBUG ===');
   
   if (window.ecCrypto) {
     const myUser = window.ecCrypto.getCurrentUser();
-    console.log('🔐 [DEBUG] My User Info:', myUser);
+    // console.log('🔐 [DEBUG] My User Info:', myUser);
     
     // Check stored key info
     chrome.storage.local.get([
@@ -2465,43 +3500,43 @@ window.debugKeyStatus = function() {
       'ecLastRotation',
       'ecRotationCount'
     ]).then(stored => {
-      console.log('🔐 [DEBUG] Stored Key Info:');
-      console.log('🔐 [DEBUG]   Key ID:', stored.ecMyKeyId);
-      console.log('🔐 [DEBUG]   Generated:', stored.ecKeyGenerated ? new Date(stored.ecKeyGenerated).toLocaleString() : 'Unknown');
-      console.log('🔐 [DEBUG]   Last Rotation:', stored.ecLastRotation ? new Date(stored.ecLastRotation).toLocaleString() : 'Never');
-      console.log('🔐 [DEBUG]   Rotation Count:', stored.ecRotationCount || 0);
-      console.log('🔐 [DEBUG]   Entropy Sample:', stored.ecKeyEntropy ? stored.ecKeyEntropy.substring(0, 50) + '...' : 'None');
+      // console.log('🔐 [DEBUG] Stored Key Info:');
+      // console.log('🔐 [DEBUG]   Key ID:', stored.ecMyKeyId);
+      // console.log('🔐 [DEBUG]   Generated:', stored.ecKeyGenerated ? new Date(stored.ecKeyGenerated).toLocaleString() : 'Unknown');
+      // console.log('🔐 [DEBUG]   Last Rotation:', stored.ecLastRotation ? new Date(stored.ecLastRotation).toLocaleString() : 'Never');
+      // console.log('🔐 [DEBUG]   Rotation Count:', stored.ecRotationCount || 0);
+      // console.log('🔐 [DEBUG]   Entropy Sample:', stored.ecKeyEntropy ? stored.ecKeyEntropy.substring(0, 50) + '...' : 'None');
       
       if (stored.ecStaticPublicKey) {
-        console.log('🔐 [DEBUG]   Public Key Sample:', stored.ecStaticPublicKey.substring(0, 50) + '...');
+        // console.log('🔐 [DEBUG]   Public Key Sample:', stored.ecStaticPublicKey.substring(0, 50) + '...');
       }
     });
     
     const contacts = Array.from(window.ecCrypto.userKeys.entries());
-    console.log('🔐 [DEBUG] Contact Count:', contacts.length);
+    // console.log('🔐 [DEBUG] Contact Count:', contacts.length);
     
     contacts.forEach(([userId, userInfo]) => {
-      console.log(`🔐 [DEBUG] Contact: ${userInfo.username} (${userId})`);
-      console.log(`🔐 [DEBUG]   Key ID: ${userInfo.keyId}`);
-      console.log(`🔐 [DEBUG]   Last Seen: ${new Date(userInfo.lastSeen).toLocaleTimeString()}`);
+      // console.log(`🔐 [DEBUG] Contact: ${userInfo.username} (${userId})`);
+      // console.log(`🔐 [DEBUG]   Key ID: ${userInfo.keyId}`);
+      // console.log(`🔐 [DEBUG]   Last Seen: ${new Date(userInfo.lastSeen).toLocaleTimeString()}`);
       if (userInfo.rotatedAt) {
-        console.log(`🔐 [DEBUG]   Rotated: ${new Date(userInfo.rotatedAt).toLocaleTimeString()}`);
-        console.log(`🔐 [DEBUG]   Previous Key: ${userInfo.previousKeyId}`);
+        // console.log(`🔐 [DEBUG]   Rotated: ${new Date(userInfo.rotatedAt).toLocaleTimeString()}`);
+        // console.log(`🔐 [DEBUG]   Previous Key: ${userInfo.previousKeyId}`);
       }
     });
   } else {
-    console.log('🔐 [DEBUG] ECCrypto not available');
+    // console.log('🔐 [DEBUG] ECCrypto not available');
   }
   
-  console.log('🔐 [DEBUG] ========================');
+  // console.log('🔐 [DEBUG] ========================');
 };
 
 // Force regenerate unique keys
 window.forceUniqueKeys = async function() {
-  console.log('🔐 [FORCE] === FORCING UNIQUE KEY GENERATION ===');
+  // console.log('🔐 [FORCE] === FORCING UNIQUE KEY GENERATION ===');
   
   if (!window.ecCrypto) {
-    console.log('🔐 [FORCE] ECCrypto not available');
+    // console.log('🔐 [FORCE] ECCrypto not available');
     return;
   }
   
@@ -2516,14 +3551,14 @@ window.forceUniqueKeys = async function() {
       'ecEntropyComponents'
     ]);
     
-    console.log('🔐 [FORCE] Cleared all stored keys');
+    // console.log('🔐 [FORCE] Cleared all stored keys');
     
     // Clear in-memory keys
     window.ecCrypto.staticPrivateKey = null;
     window.ecCrypto.staticPublicKey = null;
     window.ecCrypto.myKeyId = null;
     
-    console.log('🔐 [FORCE] Cleared in-memory keys');
+    // console.log('🔐 [FORCE] Cleared in-memory keys');
     
     // Force regeneration with unique timestamp and extra entropy
     const uniqueTimestamp = Date.now();
@@ -2531,9 +3566,9 @@ window.forceUniqueKeys = async function() {
     const userAgent = navigator.userAgent;
     const screenInfo = `${screen.width}x${screen.height}x${screen.colorDepth}`;
     
-    console.log('🔐 [FORCE] Unique Timestamp:', uniqueTimestamp);
-    console.log('🔐 [FORCE] Extra Entropy:', Array.from(extraEntropy.slice(0, 8)).join(','), '...');
-    console.log('🔐 [FORCE] Screen Info:', screenInfo);
+    // console.log('🔐 [FORCE] Unique Timestamp:', uniqueTimestamp);
+    // console.log('🔐 [FORCE] Extra Entropy:', Array.from(extraEntropy.slice(0, 8)).join(','), '...');
+    // console.log('🔐 [FORCE] Screen Info:', screenInfo);
     
     // Wait a moment to ensure timestamp differences
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -2541,48 +3576,48 @@ window.forceUniqueKeys = async function() {
     // Generate completely new keypair
     await window.ecCrypto.generateStaticKeypair();
     
-    console.log('🔐 [FORCE] New keypair generated!');
-    console.log('🔐 [FORCE] New Key ID:', window.ecCrypto.myKeyId);
+    // console.log('🔐 [FORCE] New keypair generated!');
+    // console.log('🔐 [FORCE] New Key ID:', window.ecCrypto.myKeyId);
     
     // Reload to ensure consistency
     await window.ecCrypto.loadOrGenerateStaticKeypair();
     
-    console.log('🔐 [FORCE] Reloaded and verified');
-    console.log('🔐 [FORCE] Final Key ID:', window.ecCrypto.myKeyId);
+    // console.log('🔐 [FORCE] Reloaded and verified');
+    // console.log('🔐 [FORCE] Final Key ID:', window.ecCrypto.myKeyId);
     
   } catch (error) {
     console.error('🔐 [FORCE] Error during force regeneration:', error);
   }
   
-  console.log('🔐 [FORCE] =======================================');
+  // console.log('🔐 [FORCE] =======================================');
 };
 
 // Quick fix after key rotation
 window.fixAfterRotation = async function() {
-  console.log('🔐 [FIX] === FIXING COMMUNICATION AFTER ROTATION ===');
+  // console.log('🔐 [FIX] === FIXING COMMUNICATION AFTER ROTATION ===');
   
   if (!window.ecCrypto) {
-    console.log('🔐 [FIX] ECCrypto not available');
+    // console.log('🔐 [FIX] ECCrypto not available');
     return;
   }
   
   try {
     // Clear all contacts first
     await window.ecCrypto.clearAllContacts();
-    console.log('🔐 [FIX] ✅ Cleared all contacts');
+    // console.log('🔐 [FIX] ✅ Cleared all contacts');
     
     // Force key reload
     await window.ecCrypto.loadOrGenerateStaticKeypair();
-    console.log('🔐 [FIX] ✅ Reloaded keys');
+    // console.log('🔐 [FIX] ✅ Reloaded keys');
     
-    console.log('🔐 [FIX] ✅ Ready for new contact discovery');
-    console.log('🔐 [FIX] 💡 Send a test message to rediscover contacts');
+    // console.log('🔐 [FIX] ✅ Ready for new contact discovery');
+    // console.log('🔐 [FIX] 💡 Send a test message to rediscover contacts');
     
   } catch (error) {
     console.error('🔐 [FIX] Error during fix:', error);
   }
   
-  console.log('🔐 [FIX] ==============================');
+  // console.log('🔐 [FIX] ==============================');
 };
 
 // Clean up corrupted contacts (contacts with same Key ID as ours)
@@ -2596,17 +3631,17 @@ window.cleanupCorruptedContacts = async function() {
   
   try {
     const removedCount = await window.ecCrypto.cleanupCorruptedContacts();
-    console.log(`🔐 [CLEANUP] ✅ Cleaned up ${removedCount} corrupted contacts`);
+    // console.log(`🔐 [CLEANUP] ✅ Cleaned up ${removedCount} corrupted contacts`);
     
     if (removedCount > 0) {
-      console.log('🔐 [CLEANUP] 💡 Corruption should be resolved now');
+      // console.log('🔐 [CLEANUP] 💡 Corruption should be resolved now');
     } else {
-      console.log('🔐 [CLEANUP] 💡 No corrupted contacts found');
+      // console.log('🔐 [CLEANUP] 💡 No corrupted contacts found');
     }
     
   } catch (error) {
     console.error('🔐 [CLEANUP] Error during cleanup:', error);
   }
   
-  console.log('🔐 [CLEANUP] ================================');
-}; 
+  // console.log('🔐 [CLEANUP] ================================');
+};  

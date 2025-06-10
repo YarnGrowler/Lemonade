@@ -116,7 +116,7 @@ class PopupManager {
           });
         }
       } catch (error) {
-        console.log('Could not notify content script:', error);
+        //console.log('Could not notify content script:', error);
       }
       
       this.showNotification(`Auto-encrypt ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
@@ -168,7 +168,7 @@ class PopupManager {
           });
         }
       } catch (error) {
-        console.log('Could not notify content script:', error);
+        //console.log('Could not notify content script:', error);
       }
       
       this.showNotification(`User set: ${username.trim()}`, 'success');
@@ -300,7 +300,7 @@ class PopupManager {
 
     changelogContent.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h2 style="margin: 0; font-size: 20px;">🔐 What's New in v1.2.0</h2>
+        <h2 style="margin: 0; font-size: 20px;">🎉 What's New in v2.1.0</h2>
         <button id="close-changelog" style="
           background: rgba(255,255,255,0.2);
           border: none;
@@ -313,27 +313,28 @@ class PopupManager {
       </div>
       
       <div style="line-height: 1.6;">
-        <h3 style="color: #48bb78; margin: 16px 0 8px 0;">🎉 New Features</h3>
+        <h3 style="color: #48bb78; margin: 16px 0 8px 0;">🎬 GIF Encryption Revolution</h3>
         <ul style="margin: 0; padding-left: 20px;">
-          <li><strong>Smart Chinese Spacing:</strong> Messages now look natural with proper spacing</li>
-          <li><strong>Text Compression:</strong> Shorter encrypted messages (30-50% smaller)</li>
-          <li><strong>Hotkey Support:</strong> Ctrl+Shift+E (auto-encrypt), Ctrl+Shift+D (toggle)</li>
-          <li><strong>Version Display:</strong> Always know which version you're running</li>
+          <li><strong>GIF Picker Integration:</strong> Encrypt GIFs directly from Discord's picker!</li>
+          <li><strong>Smart Detection:</strong> Only encrypts actual GIFs, skips categories</li>
+          <li><strong>Interactive Modals:</strong> Click any GIF to view in beautiful popup</li>
+          <li><strong>Large Emojis:</strong> Single emojis render extra large automatically</li>
         </ul>
 
-        <h3 style="color: #667eea; margin: 16px 0 8px 0;">🔧 Improvements</h3>
+        <h3 style="color: #667eea; margin: 16px 0 8px 0;">⚡ Performance & Experience</h3>
         <ul style="margin: 0; padding-left: 20px;">
-          <li><strong>Better Detection:</strong> More reliable encrypted message recognition</li>
-          <li><strong>Enhanced UI:</strong> Animated notifications and better visual feedback</li>
-          <li><strong>Performance:</strong> Optimized encryption and decryption algorithms</li>
+          <li><strong>Massive Optimization:</strong> Commented out 200+ debug logs</li>
+          <li><strong>Responsive Sizing:</strong> GIFs now fit their actual dimensions</li>
+          <li><strong>Better Rendering:</strong> MP4 videos play seamlessly as GIFs</li>
+          <li><strong>Enhanced UI:</strong> Smooth animations and improved feedback</li>
         </ul>
 
-        <h3 style="color: #ff6b6b; margin: 16px 0 8px 0;">🚀 Coming Soon</h3>
+        <h3 style="color: #ff6b6b; margin: 16px 0 8px 0;">🛠️ Technical Advances</h3>
         <ul style="margin: 0; padding-left: 20px;">
-          <li>Multi-key support for different servers</li>
-          <li>Message expiry and auto-delete</li>
-          <li>File encryption support</li>
-          <li>Advanced compression algorithms</li>
+          <li><strong>Network Interception:</strong> Captures Discord's GIF API calls</li>
+          <li><strong>Asymmetric Encryption:</strong> Advanced EC P-256 with key rotation</li>
+          <li><strong>Contact Discovery:</strong> Automatic user detection and management</li>
+          <li><strong>Memory Optimization:</strong> Reduced CPU usage and responsiveness</li>
         </ul>
 
         <div style="
@@ -343,9 +344,9 @@ class PopupManager {
           margin-top: 16px;
           text-align: center;
         ">
-          ⌨️ <strong>Try the new hotkeys!</strong><br>
-          Ctrl+Shift+E to toggle auto-encrypt<br>
-          Ctrl+Shift+D to toggle extension
+          🎯 <strong>Try GIF encryption!</strong><br>
+          Open Discord's GIF picker and click any GIF<br>
+          It gets encrypted and sent automatically! 🎉
         </div>
       </div>
     `;

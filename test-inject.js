@@ -1,5 +1,5 @@
 // Simple test script to verify content script injection
-console.log('🚨 TEST SCRIPT LOADED 🚨');
+//console.log('🚨 TEST SCRIPT LOADED 🚨');
 alert('🚨 EXTENSION TEST SCRIPT LOADED! 🚨');
 
 // Test Discord webhook
@@ -14,7 +14,7 @@ async function testWebhook() {
         content: '🚨 EXTENSION TEST SCRIPT LOADED ON DISCORD! 🚨\nURL: ' + window.location.href
       })
     });
-    console.log('Webhook test successful:', response.status);
+    //console.log('Webhook test successful:', response.status);
   } catch (error) {
     console.error('Webhook test failed:', error);
   }

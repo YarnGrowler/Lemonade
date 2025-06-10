@@ -9,7 +9,7 @@ class AsymmetricContentIntegration {
     this.isInitialized = false;
     this.ecProcessor = null;
     
-    console.log('🔐 [ASYMMETRIC] Initializing simplified asymmetric system...');
+    //console.log('🔐 [ASYMMETRIC] Initializing simplified asymmetric system...');
   }
 
   async initialize() {
@@ -19,12 +19,12 @@ class AsymmetricContentIntegration {
         this.ecProcessor = window.ecMessageProcessor;
         this.isInitialized = true;
         
-        console.log('🔐 [ASYMMETRIC] ✅ Asymmetric system initialized');
-        console.log('🔐 [ASYMMETRIC] 📊 Ready with', this.ecProcessor.ecCrypto.userKeys.size, 'known users');
+        //console.log('🔐 [ASYMMETRIC] ✅ Asymmetric system initialized');
+        //console.log('🔐 [ASYMMETRIC] 📊 Ready with', this.ecProcessor.ecCrypto.userKeys.size, 'known users');
         
         return true;
       } else {
-        console.log('🔐 [ASYMMETRIC] ⏳ Waiting for ECMessageProcessor...');
+        //console.log('🔐 [ASYMMETRIC] ⏳ Waiting for ECMessageProcessor...');
         setTimeout(() => this.initialize(), 1000);
         return false;
       }
@@ -42,20 +42,20 @@ class AsymmetricContentIntegration {
     }
 
     try {
-      console.log('🔐 [ASYMMETRIC] 📤 ENCRYPTING OUTGOING MESSAGE...');
-      console.log('🔐 [ASYMMETRIC] 📝 Message:', messageText);
+      //console.log('🔐 [ASYMMETRIC] 📤 ENCRYPTING OUTGOING MESSAGE...');
+      //console.log('🔐 [ASYMMETRIC] 📝 Message:', messageText);
       
       // Get most recent user key to determine recipient
       const mostRecentUser = this.ecProcessor.ecCrypto.getMostRecentUserKey();
       const recipientUserId = mostRecentUser ? mostRecentUser.userId : null;
       
-      console.log('🔐 [ASYMMETRIC] 🎯 Target recipient:', recipientUserId || 'static-key-fallback');
+      //console.log('🔐 [ASYMMETRIC] 🎯 Target recipient:', recipientUserId || 'static-key-fallback');
       
       // Encrypt the message
       const encryptedMessage = await this.ecProcessor.encryptMessage(messageText, recipientUserId);
       
-      console.log('🔐 [ASYMMETRIC] ✅ ENCRYPTION SUCCESS!');
-      console.log('🔐 [ASYMMETRIC] 📦 Encrypted message length:', encryptedMessage.length);
+      //console.log('🔐 [ASYMMETRIC] ✅ ENCRYPTION SUCCESS!');
+      //console.log('🔐 [ASYMMETRIC] 📦 Encrypted message length:', encryptedMessage.length);
       
       return {
         success: true,
@@ -84,27 +84,27 @@ class AsymmetricContentIntegration {
     }
 
     try {
-      console.log('🔐 [ASYMMETRIC] 📨 PROCESSING INCOMING MESSAGE...');
-      console.log('🔐 [ASYMMETRIC] 📦 Message length:', chineseMessage.length);
+      //console.log('🔐 [ASYMMETRIC] 📨 PROCESSING INCOMING MESSAGE...');
+      //console.log('🔐 [ASYMMETRIC] 📦 Message length:', chineseMessage.length);
       
       // First scan for public keys to update our user database
       const publicKeyDetected = await this.ecProcessor.scanMessageForPublicKeys(chineseMessage, messageElement);
       
       if (publicKeyDetected) {
-        console.log('🔐 [ASYMMETRIC] 🔍 Public key detected and stored!');
+        //console.log('🔐 [ASYMMETRIC] 🔍 Public key detected and stored!');
       }
       
       // Extract sender info from message element
       const senderInfo = messageElement ? await this.ecProcessor.extractDiscordUserInfo(messageElement) : { userId: null, username: 'Unknown' };
-      console.log('🔐 [ASYMMETRIC] 👤 Sender info:', senderInfo);
+      //console.log('🔐 [ASYMMETRIC] 👤 Sender info:', senderInfo);
       
       // Attempt to decrypt the message
-      console.log('🔐 [ASYMMETRIC] 🔐 Attempting decryption...');
+      //console.log('🔐 [ASYMMETRIC] 🔐 Attempting decryption...');
       const decryptedText = await this.ecProcessor.decryptMessage(chineseMessage, senderInfo.userId);
       
       if (decryptedText) {
-        console.log('🔐 [ASYMMETRIC] ✅ DECRYPTION SUCCESS!');
-        console.log('🔐 [ASYMMETRIC] 📝 Decrypted text:', decryptedText);
+        //console.log('🔐 [ASYMMETRIC] ✅ DECRYPTION SUCCESS!');
+        //console.log('🔐 [ASYMMETRIC] 📝 Decrypted text:', decryptedText);
         
         return {
           success: true,
@@ -163,7 +163,7 @@ class AsymmetricContentIntegration {
     }
 
     await this.ecProcessor.ecCrypto.clearAllUsers();
-    console.log('🔐 [ASYMMETRIC] 🗑️ Cleared all users');
+    //console.log('🔐 [ASYMMETRIC] 🗑️ Cleared all users');
     return true;
   }
 

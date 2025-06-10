@@ -275,7 +275,7 @@
 
         <!-- Key Rotation Section -->
         <div class="key-info">
-            <div class="key-info-title">🔄 Key Rotation (Perfect Forward Secrecy)</div>
+            <div class="key-info-title">🔄 Key Rotation & Perfect Forward Secrecy</div>
             <div class="help-text" style="margin-bottom: 16px;">
                 Automatically rotate your encryption key based on time intervals. Each rotation uses a one-way hash, 
                 ensuring old keys cannot be recovered even if your current key is compromised.
@@ -325,7 +325,7 @@
         </div>
 
         <!-- Sync Section -->
-        <div class="key-info">
+        <!-- <div class="key-info">
             <div class="key-info-title">🔄 Sync with Friend</div>
             <div class="help-text" style="margin-bottom: 16px;">
                 Generate an encrypted sync code to perfectly synchronize key rotation timing with your friend.
@@ -376,11 +376,11 @@
                 </button>
                 <div id="debug-output" style="font-size: 10px; color: #666; margin-top: 8px; font-family: monospace; max-height: 100px; overflow-y: auto; display: none;"></div>
             </div>
-        </div>
+        </div> -->
 
         <!-- Asymmetric Encryption Section -->
         <div class="key-info">
-            <div class="key-info-title">🔐 Asymmetric Encryption (EC)</div>
+            <div class="key-info-title">🔐 Asymmetric Encryption (EC P-256)</div>
             <div class="help-text" style="margin-bottom: 16px;">
                 Advanced elliptic curve encryption with automatic key exchange. No pre-shared keys needed - each user generates their own keypair and public keys are embedded in messages.
             </div>
@@ -506,34 +506,7 @@
                     </div>
                 </div>
 
-                <!-- Proof of Concept Section -->
-                <div style="background: #e8f5e8; border-radius: 8px; padding: 16px; border-left: 4px solid #28a745;">
-                    <div style="font-weight: 600; margin-bottom: 8px; color: #155724;">🧪 Proof of Concept - ECDH Security</div>
-                    <div style="font-size: 12px; line-height: 1.4; color: #155724; margin-bottom: 12px;">
-                        Elliptic Curve Diffie-Hellman requires <strong>both keys</strong> to encrypt/decrypt. Without your private key AND the recipient's public key, messages cannot be decrypted - demonstrating perfect forward secrecy.
-                    </div>
-                    
-                    <div style="margin-bottom: 8px;">
-                        <input type="text" id="demo-message" placeholder="Enter test message..." value="Hello, this is a test!" style="width: 100%; padding: 8px; border: 1px solid #c3e6cb; border-radius: 4px; font-size: 12px;">
-                    </div>
-                    
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button id="test-encrypt" class="button secondary" style="font-size: 11px; padding: 6px 10px; flex: 1; background: #28a745; color: white;">
-                            🔐 Test Encrypt
-                        </button>
-                        <button id="test-decrypt" class="button secondary" style="font-size: 11px; padding: 6px 10px; flex: 1; background: #17a2b8; color: white;">
-                            🔓 Test Decrypt
-                        </button>
-                    </div>
-                    
-                    <div style="font-size: 10px;">
-                        <div style="margin-bottom: 4px; font-weight: 500;">Encrypted Result:</div>
-                        <textarea id="encrypted-result" readonly style="width: 100%; height: 40px; font-family: monospace; font-size: 9px; padding: 4px; border: 1px solid #c3e6cb; border-radius: 4px; background: white; resize: none;" placeholder="Click 'Test Encrypt' to see result..."></textarea>
-                        
-                        <div style="margin: 8px 0 4px 0; font-weight: 500;">Decrypted Result:</div>
-                        <textarea id="decrypted-result" readonly style="width: 100%; height: 40px; font-family: monospace; font-size: 9px; padding: 4px; border: 1px solid #c3e6cb; border-radius: 4px; background: white; resize: none;" placeholder="Click 'Test Decrypt' to see result..."></textarea>
-                    </div>
-                </div>
+             
 
                 <div id="asymmetric-status" style="font-size: 12px; color: #666; background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 12px;">
                     <div>Status: <span id="ec-status-text">Initializing...</span></div>
@@ -541,49 +514,7 @@
             </div>
         </div>
 
-        <!-- Debug & Fix Tools Section -->
-        <div class="key-info" style="background: linear-gradient(135deg, #ff6b6b, #ee5a52); color: white;">
-            <div style="font-weight: 600; margin-bottom: 12px; color: white;">🔧 Debug & Quick Fixes</div>
-            <div style="font-size: 12px; line-height: 1.4; margin-bottom: 16px; opacity: 0.9;">
-                Use these tools to fix common issues with key synchronization and message decryption:
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-                <button id="debug-key-status" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
-                    📊 Debug Keys
-                </button>
-                <button id="force-unique-keys" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
-                    🔑 Force Unique
-                </button>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-                <button id="fix-after-rotation" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
-                    🔄 Fix Rotation
-                </button>
-                <button id="cleanup-temp-contacts" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
-                    🧹 Clean Temps
-                </button>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px;">
-                <button id="reset-timer" class="button" style="font-size: 11px; padding: 8px 10px; background: rgba(255,193,7,0.8); border: 1px solid rgba(255,193,7,0.5); color: #333;">
-                    ⏰ Reset Rotation Timer
-                </button>
-            </div>
-            
-            <div style="margin-bottom: 12px;">
-                <div style="font-weight: 500; margin-bottom: 4px; font-size: 12px; color: white;">Debug Output:</div>
-                <textarea id="debug-log" readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(0,0,0,0.3); color: #fff; resize: vertical;" placeholder="Debug information will appear here when you click the buttons above..."></textarea>
-            </div>
-            
-            <div style="font-size: 11px; opacity: 0.8; line-height: 1.3;">
-                <strong>Debug Keys:</strong> Shows current key status and contact info<br>
-                <strong>Force Unique:</strong> Regenerates keys with better entropy (fixes identical Key IDs)<br>
-                <strong>Fix Rotation:</strong> Clears contacts and resets after key rotation issues<br>
-                <strong>Clean Temps:</strong> Removes old temporary contacts (fixes temp contact buildup)
-            </div>
-        </div>
+  
 
         <!-- Decryption Speed Section -->
         <div class="key-info">
@@ -634,47 +565,59 @@
 
         <!-- Changelog Section -->
         <div class="key-info">
-            <div class="key-info-title">📋 Version 2.0.0 - Asymmetric Encryption Release</div>
+            <div class="key-info-title">🎉 Version 2.1.0 - GIF Encryption & UI Enhancement Release</div>
             <div style="font-size: 13px; line-height: 1.5; color: #666;">
                 <div style="margin-bottom: 12px; padding: 12px; background: #e8f5e8; border-radius: 6px; border-left: 4px solid #28a745;">
-                    <div style="font-weight: 600; color: #155724; margin-bottom: 6px;">🚀 Major New Features</div>
-                    <div>• <strong>Asymmetric Encryption (EC P-256)</strong> - No pre-shared keys needed!</div>
-                    <div>• <strong>Discord User Tracking</strong> - Automatically extracts user IDs from avatar URLs</div>
-                    <div>• <strong>Contact Discovery</strong> - Public keys embedded in messages for automatic contact detection</div>
-                    <div>• <strong>Double Ratchet Key Rotation</strong> - Configurable intervals (15m-1d) for forward secrecy</div>
-                    <div>• <strong>Enhanced Contact Management</strong> - View discovered users with Discord usernames and IDs</div>
+                    <div style="font-weight: 600; color: #155724; margin-bottom: 6px;">🎬 Revolutionary GIF Encryption</div>
+                    <div>• <strong>Full GIF Picker Integration</strong> - Encrypt GIFs directly from Discord's picker!</div>
+                    <div>• <strong>Smart Category Detection</strong> - Auto-skips category selections, only encrypts actual GIFs</div>
+                    <div>• <strong>Network URL Mapping</strong> - Intercepts Discord's API calls for perfect URL extraction</div>
+                    <div>• <strong>Video-to-GIF Rendering</strong> - Handles media.tenor.com MP4s as animated videos</div>
+                    <div>• <strong>Auto-Encrypt Respect</strong> - GIF encryption follows your auto-encrypt toggle setting</div>
                 </div>
                 
                 <div style="margin-bottom: 12px; padding: 12px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
-                    <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">⚡ Improvements</div>
-                    <div>• <strong>Configurable Decryption Speed</strong> - Ultra fast (0.5s) to very slow (5s) scanning</div>
-                    <div>• <strong>Instant Post-Send Decryption</strong> - See your encrypted messages decrypt immediately</div>
-                    <div>• <strong>Simplified Sync System</strong> - Removed complex entropy calculations for better reliability</div>
-                    <div>• <strong>Enhanced UI</strong> - Better status displays and real-time updates</div>
+                    <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">🎨 Enhanced Media Experience</div>
+                    <div>• <strong>Interactive GIF Modals</strong> - Click any GIF to view in beautiful popup (like Discord!)</div>
+                    <div>• <strong>Responsive GIF Sizing</strong> - GIFs now fit their actual dimensions perfectly</div>
+                    <div>• <strong>Large Emoji Support</strong> - Single emojis (1-3) render extra large automatically</div>
+                    <div>• <strong>Smooth Animations</strong> - Fade-in effects and zoom animations for media</div>
+                    <div>• <strong>Keyboard Controls</strong> - Press ESC or click backdrop to close GIF modals</div>
                 </div>
 
                 <div style="margin-bottom: 12px; padding: 12px; background: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                    <div style="font-weight: 600; color: #0c5460; margin-bottom: 6px;">🔧 Technical Changes</div>
-                    <div>• Modular encryption system supporting both symmetric and asymmetric modes</div>
-                    <div>• Discord user identification via avatar URL parsing</div>
-                    <div>• Improved message processing with better Discord integration</div>
-                    <div>• Enhanced contact storage with user metadata</div>
-                    <div>• Removed webhook dependencies for cleaner operation</div>
+                    <div style="font-weight: 600; color: #0c5460; margin-bottom: 6px;">⚡ Performance & Stability</div>
+                    <div>• <strong>Massive Console Cleanup</strong> - Commented out 200+ debug logs for better performance</div>
+                    <div>• <strong>Memory Optimization</strong> - Reduced CPU usage and improved browser responsiveness</div>
+                    <div>• <strong>Better Error Handling</strong> - Graceful fallbacks when GIF URLs can't be extracted</div>
+                    <div>• <strong>Improved User ID Detection</strong> - Enhanced auto-detection and manual setting options</div>
                 </div>
 
-                <div style="font-size: 12px; color: #999; margin-top: 12px;">
-                    <strong>How to use Asymmetric Mode:</strong><br/>
-                    1. Enable "Asymmetric Encryption (EC P-256)" above<br/>
-                    2. Send messages normally - first contact uses static keys<br/>
-                    3. Public keys are automatically discovered from messages<br/>
-                    4. Future messages use discovered keys for enhanced security
+                <div style="margin-bottom: 12px; padding: 12px; background: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">
+                    <div style="font-weight: 600; color: #721c24; margin-bottom: 6px;">🛠️ Technical Improvements</div>
+                    <div>• Network request interception for Discord's GIF search API</div>
+                    <div>• Clipboard-based message insertion (same method for text & GIFs)</div>
+                    <div>• Enhanced asymmetric encryption with contact auto-discovery</div>
+                    <div>• Real-time key rotation status with countdown timers</div>
+                    <div>• Comprehensive contact management with username tracking</div>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">🎯 How to Use GIF Encryption:</div>
+                    <div style="font-size: 12px; line-height: 1.4;">
+                        1. <strong>Enable auto-encrypt</strong> or keep it off for manual control<br/>
+                        2. <strong>Open Discord's GIF picker</strong> and search for any GIF<br/>
+                        3. <strong>Click on a GIF</strong> - it gets encrypted and sent automatically!<br/>
+                        4. <strong>Decrypted GIFs</strong> show as videos with popup modal support<br/>
+                        5. <strong>Categories are ignored</strong> - only actual GIF selections get encrypted
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="footer">
             <p>💡 Type <code>!priv</code> before your message in Discord to encrypt it</p>
-            <p style="font-size: 12px; color: #999; margin-top: 8px;">Discord Cryptochat v2.0.0 - Advanced Asymmetric Encryption</p>
+            <p style="font-size: 12px; color: #999; margin-top: 8px;">Discord Cryptochat v2.1.0 - GIF Encryption & Enhanced Media Experience</p>
         </div>
     </div>
 

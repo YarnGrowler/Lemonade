@@ -6,14 +6,14 @@
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('Discord Cryptochat extension installed');
+    //console.log('Discord Cryptochat extension installed');
     
     // Open options page on first install
     chrome.tabs.create({
       url: chrome.runtime.getURL('options.html')
     });
   } else if (details.reason === 'update') {
-    console.log('Discord Cryptochat extension updated');
+    //console.log('Discord Cryptochat extension updated');
   }
 });
 
@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
       
     default:
-      console.log('Unknown message action:', message.action);
+      //console.log('Unknown message action:', message.action);
   }
   
   return true; // Keep the message channel open for async responses
@@ -55,7 +55,7 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-console.log('Discord Cryptochat background script loaded');
+//console.log('Discord Cryptochat background script loaded');
 
 // ==================== KEY ROTATION MONITORING ====================
 
@@ -68,7 +68,7 @@ class BackgroundKeyRotation {
   }
 
   async init() {
-    console.log('🔐 [BACKGROUND] Initializing key rotation monitoring...');
+    //console.log('🔐 [BACKGROUND] Initializing key rotation monitoring...');
     
     // Load current stored key
     const result = await chrome.storage.local.get(['encryptionKey']);
@@ -85,7 +85,7 @@ class BackgroundKeyRotation {
     // Then check every 10 seconds
     setInterval(() => this.checkAndRotateKey(), this.keyRotationCheckInterval);
     
-    console.log('🔐 [BACKGROUND] 🔄 Key rotation monitoring started');
+    //console.log('🔐 [BACKGROUND] 🔄 Key rotation monitoring started');
   }
 
   async checkAndRotateKey() {
@@ -107,7 +107,7 @@ class BackgroundKeyRotation {
       // For first rotation we need base key, for subsequent rotations we don't
       const rotationData = await this.getLastRotationData();
       if (rotationData.count === 0 && !settings.baseKey) {
-        console.log('🔐 [BACKGROUND] ⚠️ Base key required for first rotation but not found');
+        //console.log('🔐 [BACKGROUND] ⚠️ Base key required for first rotation but not found');
         return;
       }
       
@@ -115,23 +115,23 @@ class BackgroundKeyRotation {
       const storedKey = await this.getStoredKey();
       
       if (currentKey !== storedKey) {
-        console.log('🔐 [BACKGROUND] 🔄 Key rotation needed - updating key');
-        console.log(`🔐 [BACKGROUND] Old key: ${storedKey?.substring(0, 8)}...`);
-        console.log(`🔐 [BACKGROUND] New key: ${currentKey?.substring(0, 8)}...`);
+        //console.log('🔐 [BACKGROUND] 🔄 Key rotation needed - updating key');
+        //console.log(`🔐 [BACKGROUND] Old key: ${storedKey?.substring(0, 8)}...`);
+        //console.log(`🔐 [BACKGROUND] New key: ${currentKey?.substring(0, 8)}...`);
         
-        await this.storeKey(currentKey);
-        this.currentStoredKey = currentKey;
+                 await this.storeKey(currentKey);
+         this.currentStoredKey = currentKey;
+         
+         // Update rotation tracking
+         await this.updateRotationData();
+         
+         // Security: Delete base key after first rotation
+         await this.deleteBaseKeyAfterFirstRotation(settings);
+         
+         // Notify all Discord content scripts about key update
+         await this.notifyContentScriptsKeyUpdate(currentKey);
         
-        // Update rotation tracking
-        await this.updateRotationData();
-        
-        // Security: Delete base key after first rotation
-        await this.deleteBaseKeyAfterFirstRotation(settings);
-        
-        // Notify all Discord content scripts about key update
-        await this.notifyContentScriptsKeyUpdate(currentKey);
-       
-       console.log('🔐 [BACKGROUND] ✅ Key rotation completed and content scripts notified');
+        //console.log('🔐 [BACKGROUND] ✅ Key rotation completed and content scripts notified');
       }
       
     } catch (error) {
@@ -147,24 +147,24 @@ class BackgroundKeyRotation {
     const storedKey = await this.getStoredKey();
     const lastRotationData = await this.getLastRotationData();
     
-    console.log(`🔐 [BACKGROUND] 🔄 Rotation check: stored key exists=${!!storedKey}, last rotation count=${lastRotationData.count}, last timestamp=${lastRotationData.timestamp}`);
+    //console.log(`🔐 [BACKGROUND] 🔄 Rotation check: stored key exists=${!!storedKey}, last rotation count=${lastRotationData.count}, last timestamp=${lastRotationData.timestamp}`);
     
     // Determine next rotation time
     let nextRotationTime;
     if (lastRotationData.count === 0 && lastRotationData.timestamp === 0) {
       // First rotation ever
       nextRotationTime = startTimestamp + intervalMs;
-      console.log(`🔐 [BACKGROUND] 🔄 First rotation scheduled at ${new Date(nextRotationTime)}`);
+      //console.log(`🔐 [BACKGROUND] 🔄 First rotation scheduled at ${new Date(nextRotationTime)}`);
     } else {
       // Subsequent rotations based on last rotation
       nextRotationTime = lastRotationData.timestamp + intervalMs;
-      console.log(`🔐 [BACKGROUND] 🔄 Next rotation scheduled at ${new Date(nextRotationTime)}`);
+      //console.log(`🔐 [BACKGROUND] 🔄 Next rotation scheduled at ${new Date(nextRotationTime)}`);
     }
     
     // Check if rotation is needed
     if (now >= nextRotationTime) {
       const newRotationCount = lastRotationData.count + 1;
-      console.log(`🔐 [BACKGROUND] 🔄 Performing rotation #${newRotationCount}`);
+      //console.log(`🔐 [BACKGROUND] 🔄 Performing rotation #${newRotationCount}`);
       
       // For first rotation, use base key. For subsequent rotations, use current stored key
       const sourceKey = (lastRotationData.count === 0) ? baseKey : storedKey;
@@ -176,13 +176,13 @@ class BackgroundKeyRotation {
       // Simple sequential hashing - no entropy for better sync compatibility
       const newKey = await this.simpleHashKey(sourceKey, newRotationCount);
       
-      console.log(`🔐 [BACKGROUND] 🔄 Rotation #${newRotationCount}: ${sourceKey.substring(0, 8)}... → ${newKey.substring(0, 8)}...`);
+      //console.log(`🔐 [BACKGROUND] 🔄 Rotation #${newRotationCount}: ${sourceKey.substring(0, 8)}... → ${newKey.substring(0, 8)}...`);
       
       return newKey;
     }
     
     // No rotation needed - return current key
-    console.log(`🔐 [BACKGROUND] 🔄 No rotation needed (next in ${Math.ceil((nextRotationTime - now) / 1000)}s)`);
+    //console.log(`🔐 [BACKGROUND] 🔄 No rotation needed (next in ${Math.ceil((nextRotationTime - now) / 1000)}s)`);
     return storedKey;
   }
 
@@ -210,7 +210,7 @@ class BackgroundKeyRotation {
       const result = await chrome.storage.local.get(['keyRotationBaseKey']);
       if (result.keyRotationBaseKey) {
         await chrome.storage.local.remove(['keyRotationBaseKey']);
-        console.log('🔐 [BACKGROUND] 🗑️ Base key securely deleted after first rotation');
+        //console.log('🔐 [BACKGROUND] 🗑️ Base key securely deleted after first rotation');
       }
     }
   }
@@ -228,14 +228,14 @@ class BackgroundKeyRotation {
               newKey: newKey
             });
             notificationsSent++;
-            console.log(`🔐 [BACKGROUND] ✅ Notified tab ${tab.id} of key rotation`);
+            //console.log(`🔐 [BACKGROUND] ✅ Notified tab ${tab.id} of key rotation`);
           } catch (error) {
-            console.log(`🔐 [BACKGROUND] ⚠️ Failed to notify tab ${tab.id}:`, error.message);
+            //console.log(`🔐 [BACKGROUND] ⚠️ Failed to notify tab ${tab.id}:`, error.message);
           }
         }
       }
       
-      console.log(`🔐 [BACKGROUND] 📡 Sent key rotation notifications to ${notificationsSent} Discord tabs`);
+      //console.log(`🔐 [BACKGROUND] 📡 Sent key rotation notifications to ${notificationsSent} Discord tabs`);
       
     } catch (error) {
       console.error('🔐 [BACKGROUND] ❌ Failed to notify content scripts:', error);
@@ -285,7 +285,7 @@ class BackgroundKeyRotation {
       rotationCount: newCount
     });
     
-    console.log(`🔐 [BACKGROUND] 📊 Rotation tracking updated: count=${newCount}, timestamp=${newTimestamp}`);
+    //console.log(`🔐 [BACKGROUND] 📊 Rotation tracking updated: count=${newCount}, timestamp=${newTimestamp}`);
   }
 
   async resetRotationTracking() {
@@ -321,7 +321,7 @@ class BackgroundECRotation {
   }
 
   async init() {
-    console.log('🔐 [BACKGROUND] 🔑 Initializing EC key rotation monitoring...');
+    //console.log('🔐 [BACKGROUND] 🔑 Initializing EC key rotation monitoring...');
     
     // Start monitoring immediately
     this.startECRotationMonitoring();
@@ -334,7 +334,7 @@ class BackgroundECRotation {
     // Then check every 5 seconds
     setInterval(() => this.checkAndRotateECKey(), this.ecRotationCheckInterval);
     
-    console.log('🔐 [BACKGROUND] 🔑 EC key rotation monitoring started');
+    //console.log('🔐 [BACKGROUND] 🔑 EC key rotation monitoring started');
   }
 
   async checkAndRotateECKey() {
@@ -361,16 +361,16 @@ class BackgroundECRotation {
          // No timestamp available, set initial baseline
          baseTimestamp = now;
          await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
-         console.log(`🔐 [BACKGROUND] 🔑 Set initial rotation baseline: ${new Date(baseTimestamp).toLocaleString()}`);
+         //console.log(`🔐 [BACKGROUND] 🔑 Set initial rotation baseline: ${new Date(baseTimestamp).toLocaleString()}`);
        }
        
        const nextRotationTime = baseTimestamp + settings.intervalMs;
       
       if (now >= nextRotationTime) {
-        console.log('🔐 [BACKGROUND] 🔑 EC key rotation due - triggering rotation');
-        console.log(`🔐 [BACKGROUND] 🔑 Last rotation: ${new Date(lastRotation).toLocaleString()}`);
-        console.log(`🔐 [BACKGROUND] 🔑 Next rotation was: ${new Date(nextRotationTime).toLocaleString()}`);
-        console.log(`🔐 [BACKGROUND] 🔑 Overdue by: ${Math.round((now - nextRotationTime) / 1000)} seconds`);
+        //console.log('🔐 [BACKGROUND] 🔑 EC key rotation due - triggering rotation');
+        //console.log(`🔐 [BACKGROUND] 🔑 Last rotation: ${new Date(lastRotation).toLocaleString()}`);
+        //console.log(`🔐 [BACKGROUND] 🔑 Next rotation was: ${new Date(nextRotationTime).toLocaleString()}`);
+        //console.log(`🔐 [BACKGROUND] 🔑 Overdue by: ${Math.round((now - nextRotationTime) / 1000)} seconds`);
         
         // Trigger rotation by notifying Discord tabs
         await this.triggerECKeyRotation();
@@ -380,11 +380,11 @@ class BackgroundECRotation {
           ecLastRotation: now
         });
         
-        console.log('🔐 [BACKGROUND] 🔑 ✅ EC key rotation triggered and timestamp updated');
+        //console.log('🔐 [BACKGROUND] 🔑 ✅ EC key rotation triggered and timestamp updated');
       } else {
         const timeUntilNext = Math.ceil((nextRotationTime - now) / 1000);
         if (timeUntilNext % 30 === 0) { // Log every 30 seconds
-          console.log(`🔐 [BACKGROUND] 🔑 EC rotation in ${timeUntilNext}s`);
+          //console.log(`🔐 [BACKGROUND] 🔑 EC rotation in ${timeUntilNext}s`);
         }
       }
       
@@ -399,7 +399,7 @@ class BackgroundECRotation {
       const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
       
       if (tabs.length === 0) {
-        console.log('🔐 [BACKGROUND] 🔑 No Discord tabs found for EC rotation');
+        //console.log('🔐 [BACKGROUND] 🔑 No Discord tabs found for EC rotation');
         return;
       }
       
@@ -409,12 +409,12 @@ class BackgroundECRotation {
           action: 'rotateECKeys',
           source: 'background_timer'
         }).catch(error => {
-          console.log(`🔐 [BACKGROUND] 🔑 Failed to send rotation to tab ${tab.id}:`, error.message);
+          //console.log(`🔐 [BACKGROUND] 🔑 Failed to send rotation to tab ${tab.id}:`, error.message);
         })
       );
       
       await Promise.all(rotationPromises);
-      console.log(`🔐 [BACKGROUND] 🔑 Sent EC rotation command to ${tabs.length} Discord tabs`);
+      //console.log(`🔐 [BACKGROUND] 🔑 Sent EC rotation command to ${tabs.length} Discord tabs`);
       
     } catch (error) {
       console.error('🔐 [BACKGROUND] 🔑 Failed to trigger EC rotation:', error);
@@ -444,5 +444,5 @@ class BackgroundECRotation {
 }
 
 // Initialize key rotation monitoring
-const keyRotationManager = new BackgroundKeyRotation();
+const keyRotationManager = new BackgroundKeyRotation(); 
 const ecRotationManager = new BackgroundECRotation(); 

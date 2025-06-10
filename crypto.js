@@ -127,7 +127,7 @@ class DiscordCrypto {
     // Final space compression
     compressed = compressed.replace(/\s+/g, '~');
     
-    console.log(`🔐 [CRYPTO] Compression: ${text.length} → ${compressed.length} chars (${((1 - compressed.length/text.length) * 100).toFixed(1)}% reduction)`);
+    //console.log(`🔐 [CRYPTO] Compression: ${text.length} → ${compressed.length} chars (${((1 - compressed.length/text.length) * 100).toFixed(1)}% reduction)`);
     
     return compressed;
   }
@@ -362,7 +362,7 @@ class DiscordCrypto {
     // Then check every 10 seconds
     setInterval(() => this.checkAndRotateKey(), this.keyRotationCheckInterval);
     
-    console.log('🔐 [CRYPTO] 🔄 Key rotation monitoring started');
+    //console.log('🔐 [CRYPTO] 🔄 Key rotation monitoring started');
   }
 
   async checkAndRotateKey() {
@@ -385,7 +385,7 @@ class DiscordCrypto {
       const storedKey = await this.getStoredKey();
       
       if (currentKey !== storedKey) {
-        console.log('🔐 [CRYPTO] 🔄 Key rotation needed - updating key');
+        //console.log('🔐 [CRYPTO] 🔄 Key rotation needed - updating key');
         await this.storeKey(currentKey);
         
         // Security: Delete base key after first rotation for perfect forward secrecy
@@ -411,7 +411,7 @@ class DiscordCrypto {
     const elapsed = now - startTimestamp;
     const rotationsNeeded = Math.floor(elapsed / intervalMs);
     
-    console.log(`🔐 [CRYPTO] 🔄 Calculating enhanced key rotation: ${rotationsNeeded} rotations needed`);
+    //console.log(`🔐 [CRYPTO] 🔄 Calculating enhanced key rotation: ${rotationsNeeded} rotations needed`);
     
     // Enhanced rotation with entropy injection
     let currentKey = baseKey;
@@ -515,7 +515,7 @@ class DiscordCrypto {
       }, resolve);
     });
     
-    console.log(`🔐 [CRYPTO] 🔄 Key rotation setup: ${intervalMs}ms intervals`);
+    //console.log(`🔐 [CRYPTO] 🔄 Key rotation setup: ${intervalMs}ms intervals`);
     
     // Force immediate check
     setTimeout(() => this.checkAndRotateKey(), 100);
@@ -528,7 +528,7 @@ class DiscordCrypto {
       }, resolve);
     });
     
-    console.log('🔐 [CRYPTO] 🔄 Key rotation disabled');
+    //console.log('🔐 [CRYPTO] 🔄 Key rotation disabled');
   }
 
   formatRotationInterval(ms) {
@@ -561,7 +561,7 @@ class DiscordCrypto {
       if (hasBaseKey) {
         await new Promise(resolve => {
           chrome.storage.local.remove(['keyRotationBaseKey'], () => {
-            console.log('🔐 [CRYPTO] 🗑️ Base key securely deleted after first rotation');
+            //console.log('🔐 [CRYPTO] 🗑️ Base key securely deleted after first rotation');
             resolve();
           });
         });
