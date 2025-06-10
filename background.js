@@ -135,7 +135,7 @@ class BackgroundKeyRotation {
       }
       
     } catch (error) {
-      console.error('🔐 [BACKGROUND] ❌ Key rotation check failed:', error);
+      //console.log('🔐 [BACKGROUND] ❌ Key rotation check failed:', error);
     }
   }
 
@@ -238,7 +238,7 @@ class BackgroundKeyRotation {
       //console.log(`🔐 [BACKGROUND] 📡 Sent key rotation notifications to ${notificationsSent} Discord tabs`);
       
     } catch (error) {
-      console.error('🔐 [BACKGROUND] ❌ Failed to notify content scripts:', error);
+      //console.log('🔐 [BACKGROUND] ❌ Failed to notify content scripts:', error);
     }
   }
 
@@ -353,18 +353,26 @@ class BackgroundECRotation {
         return; // EC rotation not configured or disabled
       }
       
-             // TIMESTAMP-BASED rotation check (survives restarts)
-       // Priority: lastRotation > keyGenerated > now
-       let baseTimestamp = settings.lastRotation || settings.keyGenerated;
-       
-       if (!baseTimestamp) {
-         // No timestamp available, set initial baseline
-         baseTimestamp = now;
-         await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
-         //console.log(`🔐 [BACKGROUND] 🔑 Set initial rotation baseline: ${new Date(baseTimestamp).toLocaleString()}`);
-       }
-       
-       const nextRotationTime = baseTimestamp + settings.intervalMs;
+                   // PROPER EPOCH-BASED rotation check (survives restarts)
+      // Use stored epoch timestamp as absolute reference point
+      let rotationEpoch = settings.rotationEpoch || settings.lastRotation || settings.keyGenerated;
+      
+      if (!rotationEpoch) {
+        // No epoch set yet - set it now and store it
+        rotationEpoch = now;
+        await chrome.storage.local.set({ 
+          ecRotationEpoch: rotationEpoch,
+          ecLastRotation: rotationEpoch 
+        });
+        // console.log('🔐 [BACKGROUND] 🔑 Set new EC rotation epoch:', new Date(rotationEpoch).toLocaleString());
+      }
+      
+      // Calculate how many rotation cycles have passed since epoch
+      const timeSinceEpoch = now - rotationEpoch;
+      const cyclesPassed = Math.floor(timeSinceEpoch / settings.intervalMs);
+      
+      // Next rotation is at epoch + (cycles + 1) * interval
+      const nextRotationTime = rotationEpoch + ((cyclesPassed + 1) * settings.intervalMs);
       
       if (now >= nextRotationTime) {
         //console.log('🔐 [BACKGROUND] 🔑 EC key rotation due - triggering rotation');
@@ -380,16 +388,16 @@ class BackgroundECRotation {
           ecLastRotation: now
         });
         
-        //console.log('🔐 [BACKGROUND] 🔑 ✅ EC key rotation triggered and timestamp updated');
+        console.log('🔐 [BACKGROUND] 🔑 ✅ EC key rotation triggered and timestamp updated');
       } else {
         const timeUntilNext = Math.ceil((nextRotationTime - now) / 1000);
         if (timeUntilNext % 30 === 0) { // Log every 30 seconds
-          //console.log(`🔐 [BACKGROUND] 🔑 EC rotation in ${timeUntilNext}s`);
+          console.log(`🔐 [BACKGROUND] 🔑 EC rotation in ${timeUntilNext}s (Epoch: ${new Date(rotationEpoch).toLocaleString()}, Cycles: ${cyclesPassed})`);
         }
       }
       
     } catch (error) {
-      console.error('🔐 [BACKGROUND] 🔑 ❌ EC rotation check failed:', error);
+      //console.log('🔐 [BACKGROUND] 🔑 ❌ EC rotation check failed:', error);
     }
   }
 
@@ -417,7 +425,7 @@ class BackgroundECRotation {
       //console.log(`🔐 [BACKGROUND] 🔑 Sent EC rotation command to ${tabs.length} Discord tabs`);
       
     } catch (error) {
-      console.error('🔐 [BACKGROUND] 🔑 Failed to trigger EC rotation:', error);
+      //console.log('🔐 [BACKGROUND] 🔑 Failed to trigger EC rotation:', error);
     }
   }
 
@@ -426,6 +434,7 @@ class BackgroundECRotation {
       const result = await chrome.storage.local.get([
         'ecEnabled',
         'ecRotationInterval', 
+        'ecRotationEpoch',
         'ecLastRotation',
         'ecKeyGenerated'
       ]);
@@ -433,12 +442,13 @@ class BackgroundECRotation {
       return {
         enabled: result.ecEnabled || false,
         intervalMs: result.ecRotationInterval || null,
+        rotationEpoch: result.ecRotationEpoch || 0,
         lastRotation: result.ecLastRotation || 0,
         keyGenerated: result.ecKeyGenerated || 0
       };
     } catch (error) {
-      console.error('🔐 [BACKGROUND] 🔑 Failed to get EC rotation settings:', error);
-      return { enabled: false, intervalMs: null, lastRotation: 0, keyGenerated: 0 };
+      //console.log('🔐 [BACKGROUND] 🔑 Failed to get EC rotation settings:', error);
+      return { enabled: false, intervalMs: null, rotationEpoch: 0, lastRotation: 0, keyGenerated: 0 };
     }
   }
 }

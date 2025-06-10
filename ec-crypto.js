@@ -49,7 +49,7 @@ class ECCrypto {
       //console.log('🔐 [EC] 📊 Loaded user keys:', this.userKeys.size);
       //console.log('🔐 [EC] 👤 Current user:', this.currentUsername, '(ID:', this.currentUserId + ')');
     } catch (error) {
-      console.error('🔐 [EC] ❌ Failed to initialize:', error);
+      //console.log('🔐 [EC] ❌ Failed to initialize:', error);
     }
   }
 
@@ -103,7 +103,7 @@ class ECCrypto {
       //console.log('🔐 [EC] 🔑 My Public Key:', publicKeyBase64.substring(0, 32) + '...');
       
     } catch (error) {
-      console.error('🔐 [EC] ❌ Static keypair error:', error);
+      //console.log('🔐 [EC] ❌ Static keypair error:', error);
       // Force regeneration on error
       //console.log('🔐 [EC] 🔄 Forcing new keypair generation due to error...');
       await this.generateStaticKeypair();
@@ -212,7 +212,7 @@ class ECCrypto {
       
      
     } catch (error) {
-      console.error('🔐 [EC] ❌ Failed to load current user info:', error);
+      //console.log('🔐 [EC] ❌ Failed to load current user info:', error);
     }
   }
 
@@ -622,7 +622,7 @@ class ECCrypto {
       
       return contacts;
     } catch (error) {
-      console.error('Failed to get contact list:', error);
+      //console.log('Failed to get contact list:', error);
       return [];
     }
   }
@@ -632,7 +632,7 @@ class ECCrypto {
       this.userKeys.clear();
       await chrome.storage.local.set({ ecUserKeys: {} });
     } catch (error) {
-      console.error('Failed to clear contacts:', error);
+      //console.log('Failed to clear contacts:', error);
       throw error;
     }
   }
@@ -657,7 +657,7 @@ class ECCrypto {
       }
       
     } catch (error) {
-      console.error('Failed to update rotation interval:', error);
+      //console.log('Failed to update rotation interval:', error);
       throw error;
     }
   }
@@ -694,7 +694,7 @@ class ECCrypto {
       await this.loadOrGenerateStaticKeypair();
       
     } catch (error) {
-      console.error('Failed to rotate keys:', error);
+      //console.log('Failed to rotate keys:', error);
       throw error;
     }
   }
@@ -714,7 +714,7 @@ class ECCrypto {
         // Setup next rotation
         this.setupRotationTimer(intervalMs);
       } catch (error) {
-        console.error('Automatic key rotation failed:', error);
+        //console.log('Automatic key rotation failed:', error);
       }
     }, intervalMs);
   }
@@ -725,7 +725,7 @@ class ECCrypto {
       await chrome.storage.local.set({ ecUserKeys: keysObject });
       //console.log('🔐 [EC] 💾 Saved', this.userKeys.size, 'user keys');
     } catch (error) {
-      console.error('🔐 [EC] ❌ Failed to save user keys:', error);
+      //console.log('🔐 [EC] ❌ Failed to save user keys:', error);
     }
   }
 
@@ -742,7 +742,7 @@ class ECCrypto {
         }
       }
     } catch (error) {
-      console.error('🔐 [EC] ❌ Failed to load user keys:', error);
+      //console.log('🔐 [EC] ❌ Failed to load user keys:', error);
     }
   }
 
@@ -817,7 +817,7 @@ class ECCrypto {
       return result;
       
     } catch (error) {
-      console.error('🔐 [EC] ❌ ENCRYPTION FAILED:', error);
+      //console.log('🔐 [EC] ❌ ENCRYPTION FAILED:', error);
       throw error;
     }
   }
@@ -992,7 +992,7 @@ class ECCrypto {
       }
       
     } catch (error) {
-      console.error('🔐 [EC] ❌ DECRYPTION FAILED:', error);
+      //console.log('🔐 [EC] ❌ DECRYPTION FAILED:', error);
       throw error;
     }
   }

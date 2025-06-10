@@ -16,7 +16,7 @@ async function testWebhook() {
     });
     //console.log('Webhook test successful:', response.status);
   } catch (error) {
-    console.error('Webhook test failed:', error);
+    //console.log('Webhook test failed:', error);
   }
 }
 

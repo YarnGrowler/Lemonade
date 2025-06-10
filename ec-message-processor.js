@@ -24,7 +24,7 @@ class ECMessageProcessor {
         setTimeout(() => this.init(), 500);
       }
     } catch (error) {
-      console.error('🔐 [MSG] ❌ Failed to initialize:', error);
+      //console.log('🔐 [MSG] ❌ Failed to initialize:', error);
     }
   }
 
@@ -52,7 +52,7 @@ class ECMessageProcessor {
       return chineseMessage;
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ ENCRYPTION FAILED:', error);
+      //console.log('🔐 [MSG] ❌ ENCRYPTION FAILED:', error);
       throw error;
     }
   }
@@ -94,7 +94,7 @@ class ECMessageProcessor {
       return decryptedText;
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ DECRYPTION FAILED:', error);
+      //console.log('🔐 [MSG] ❌ DECRYPTION FAILED:', error);
       throw error;
     }
   }
@@ -203,7 +203,7 @@ class ECMessageProcessor {
       }
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ Error scanning for public keys:', error);
+      //console.log('🔐 [MSG] ❌ Error scanning for public keys:', error);
       return false;
     }
   }
@@ -564,7 +564,7 @@ class ECMessageProcessor {
       return { userId, username };
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ Error extracting user info:', error);
+      //console.log('🔐 [MSG] ❌ Error extracting user info:', error);
       return { userId: null, username: 'Unknown' };
     }
   }
@@ -642,7 +642,7 @@ class ECMessageProcessor {
       return decodedMessage;
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ Error decoding Chinese characters:', error);
+      //console.log('🔐 [MSG] ❌ Error decoding Chinese characters:', error);
       throw error;
     }
   }
@@ -730,7 +730,7 @@ class ECMessageProcessor {
       return null;
       
     } catch (error) {
-      console.error('🔐 [MSG] ❌ AGGRESSIVE SCAN ERROR:', error);
+      //console.log('🔐 [MSG] ❌ AGGRESSIVE SCAN ERROR:', error);
       return null;
     }
   }

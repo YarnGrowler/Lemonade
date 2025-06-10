@@ -29,7 +29,7 @@ class AsymmetricContentIntegration {
         return false;
       }
     } catch (error) {
-      console.error('🔐 [ASYMMETRIC] ❌ Failed to initialize:', error);
+      // //console.log('🔐 [ASYMMETRIC] ❌ Failed to initialize:', error);
       return false;
     }
   }
@@ -68,7 +68,7 @@ class AsymmetricContentIntegration {
       };
       
     } catch (error) {
-      console.error('🔐 [ASYMMETRIC] ❌ ENCRYPTION FAILED:', error);
+      // //console.log('🔐 [ASYMMETRIC] ❌ ENCRYPTION FAILED:', error);
       return {
         success: false,
         error: error.message
@@ -121,7 +121,7 @@ class AsymmetricContentIntegration {
       }
       
     } catch (error) {
-      console.error('🔐 [ASYMMETRIC] ❌ DECRYPTION FAILED:', error);
+      // //console.log('🔐 [ASYMMETRIC] ❌ DECRYPTION FAILED:', error);
       return {
         success: false,
         error: error.message,

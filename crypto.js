@@ -248,7 +248,7 @@ class DiscordCrypto {
       // Use more compact base64url encoding (no padding)
       return this.toBase64Url(combined);
     } catch (error) {
-      console.error('Encryption failed:', error);
+      //console.log('Encryption failed:', error);
       throw new Error('Failed to encrypt message');
     }
   }
@@ -311,7 +311,7 @@ class DiscordCrypto {
       // Decompress the text
       return this.decompressText(compressed);
     } catch (error) {
-      console.error('Decryption failed:', error);
+      //console.log('Decryption failed:', error);
       throw new Error('Failed to decrypt message - check your key');
     }
   }
@@ -401,7 +401,7 @@ class DiscordCrypto {
       }
       
     } catch (error) {
-      console.error('🔐 [CRYPTO] ❌ Key rotation check failed:', error);
+      //console.log('🔐 [CRYPTO] ❌ Key rotation check failed:', error);
     }
   }
 

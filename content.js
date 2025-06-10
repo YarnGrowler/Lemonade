@@ -93,7 +93,7 @@ class DiscordCryptochat {
                 this.mapTenorUrls(data);
               }
             }).catch(error => {
-              console.error('🔐 [GIF] ❌ Failed to parse GIF search response:', error);
+              //console.log('🔐 [GIF] ❌ Failed to parse GIF search response:', error);
             });
           }
           return response;
@@ -120,7 +120,7 @@ class DiscordCryptochat {
                 window.discordCryptochat?.mapTenorUrls(data);
               }
             } catch (error) {
-              console.error('🔐 [GIF] ❌ Failed to parse XHR GIF search response:', error);
+              //console.log('🔐 [GIF] ❌ Failed to parse XHR GIF search response:', error);
             }
           }
         });
@@ -173,7 +173,7 @@ class DiscordCryptochat {
         this.showKeyWarning();
       }
     } catch (error) {
-      console.error('Failed to load encryption key:', error);
+      //console.log('Failed to load encryption key:', error);
     }
   }
 
@@ -188,7 +188,7 @@ class DiscordCryptochat {
       this.maxScanFrequency = this.scanFrequency * 3; // Adaptive max
       
     } catch (error) {
-      console.error('Failed to load speed settings:', error);
+      //console.log('Failed to load speed settings:', error);
       // Fallback to defaults
       this.scanFrequency = 1000;
       this.initialDelay = 500;
@@ -259,7 +259,7 @@ class DiscordCryptochat {
         // console.log('🔐 [CRYPTO] Available methods:', Object.getOwnPropertyNames(this.__proto__));
       }
     } catch (error) {
-      console.error('🔐 [CRYPTO] ❌ Asymmetric initialization error:', error);
+      //console.log('🔐 [CRYPTO] ❌ Asymmetric initialization error:', error);
     }
     
     // Debug: Check asymmetric status after a delay
@@ -472,7 +472,14 @@ class DiscordCryptochat {
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
-          // Look for GIF picker containers
+          // Clean up removed nodes first to prevent memory leaks
+          mutation.removedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              this.cleanupGifPickerElement(node);
+            }
+          });
+          
+          // Look for GIF picker containers in added nodes
           const gifPickerContainers = [
             ...mutation.addedNodes
           ].filter(node => 
@@ -489,7 +496,14 @@ class DiscordCryptochat {
           }
           
           gifPickerContainers.forEach(container => {
-            this.interceptGifPickerInContainer(container);
+            // Add small delay to let Discord finish rendering
+            setTimeout(() => {
+              try {
+                this.interceptGifPickerInContainer(container);
+              } catch (error) {
+                console.log('🔐 [GIF] ⚠️ Non-critical error during GIF interception:', error.message);
+              }
+            }, 50);
           });
         }
       }
@@ -501,10 +515,135 @@ class DiscordCryptochat {
       subtree: true
     });
     
+    // Store observer for cleanup
+    this.gifPickerObserver = observer;
+    
     // Also intercept any existing GIF pickers
     this.interceptExistingGifPickers();
     
+    // Cleanup function for when extension is disabled/reloaded
+    window.addEventListener('beforeunload', () => {
+      this.cleanupAllGifInterception();
+    });
+    
+    // Global error handler for DOM manipulation issues
+    window.addEventListener('error', (event) => {
+      if (event.error && event.error.message && 
+          event.error.message.includes('removeChild') &&
+          event.error.message.includes('not a child')) {
+        console.log('🔐 [GIF] 🛡️ Caught DOM removeChild error - cleaning up overlays');
+        // Clean up any leftover feedback overlays that might be causing issues
+        try {
+          const leftoverOverlays = document.querySelectorAll('.crypto-gif-feedback');
+          leftoverOverlays.forEach(overlay => {
+            try {
+              if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+              }
+            } catch (e) {
+              // Ignore
+            }
+          });
+        } catch (e) {
+          // Ignore
+        }
+        event.preventDefault(); // Prevent the error from crashing Discord
+        return true;
+      }
+    });
+    
     // console.log('🔐 [GIF] ✅ GIF picker interception setup complete');
+  }
+
+  // Clean up function to safely remove our modifications
+  cleanupGifPickerElement(element) {
+    try {
+      // Clean up debounce timers
+      if (element._debounceTimer) {
+        clearTimeout(element._debounceTimer);
+        delete element._debounceTimer;
+      }
+      
+      // Clean up observers
+      if (element._cryptoObserver) {
+        element._cryptoObserver.disconnect();
+        delete element._cryptoObserver;
+      }
+      
+      // Remove any crypto feedback overlays that might be children of this element
+      const feedbackOverlays = element.querySelectorAll('.crypto-gif-feedback');
+      feedbackOverlays.forEach(overlay => {
+        try {
+          if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+          }
+        } catch (error) {
+          // Ignore - element may already be removed
+        }
+      });
+      
+      // Clean up event handlers from intercepted GIF results
+      const interceptedElements = element.querySelectorAll('[data-crypto-intercepted="true"]');
+      interceptedElements.forEach(el => {
+        try {
+          if (el._cryptoClickHandler) {
+            el.removeEventListener('click', el._cryptoClickHandler, { capture: true });
+            delete el._cryptoClickHandler;
+          }
+          
+          // Also clean up child elements
+          const childElements = el.querySelectorAll('video, img');
+          childElements.forEach(child => {
+            if (child._cryptoClickHandler) {
+              child.removeEventListener('click', child._cryptoClickHandler, { capture: true });
+              delete child._cryptoClickHandler;
+            }
+          });
+          
+          delete el.dataset.cryptoIntercepted;
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      });
+      
+      // Clean up container-level data
+      delete element.dataset.cryptoGifIntercepted;
+      
+    } catch (error) {
+      // Ignore cleanup errors - this is just preventive maintenance
+    }
+  }
+
+  // Global cleanup function
+  cleanupAllGifInterception() {
+    try {
+      // Remove all feedback overlays
+      const allOverlays = document.querySelectorAll('.crypto-gif-feedback');
+      allOverlays.forEach(overlay => {
+        try {
+          if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+          }
+        } catch (error) {
+          // Ignore
+        }
+      });
+      
+      // Clean up all intercepted elements
+      const allIntercepted = document.querySelectorAll('[data-crypto-intercepted="true"]');
+      allIntercepted.forEach(el => {
+        this.cleanupGifPickerElement(el.parentNode || el);
+      });
+      
+      // Disconnect observers
+      if (this.gifPickerObserver) {
+        this.gifPickerObserver.disconnect();
+        this.gifPickerObserver = null;
+      }
+      
+    } catch (error) {
+      // Ignore cleanup errors
+    }
   }
 
   interceptExistingGifPickers() {
@@ -520,36 +659,63 @@ class DiscordCryptochat {
       return; // Already intercepted
     }
     
-    // console.log('🔐 [GIF] 🎯 Intercepting GIF picker container');
-    container.dataset.cryptoGifIntercepted = 'true';
-    
-    // Find all GIF result elements
-    const gifResults = container.querySelectorAll('.result__2dc39');
-    
-    gifResults.forEach((gifResult, index) => {
-      this.interceptGifResult(gifResult, index);
-    });
-    
-    // Set up observer for new GIF results that might be added dynamically
-    const resultObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          const newGifResults = [...mutation.addedNodes].filter(node => 
-            node.nodeType === Node.ELEMENT_NODE && 
-            node.classList?.contains('result__2dc39')
-          );
-          
-          newGifResults.forEach((gifResult, index) => {
-            this.interceptGifResult(gifResult, index);
-          });
+    try {
+      // console.log('🔐 [GIF] 🎯 Intercepting GIF picker container');
+      container.dataset.cryptoGifIntercepted = 'true';
+      
+      // Find all GIF result elements
+      const gifResults = container.querySelectorAll('.result__2dc39');
+      
+      gifResults.forEach((gifResult, index) => {
+        try {
+          this.interceptGifResult(gifResult, index);
+        } catch (error) {
+          console.log(`🔐 [GIF] ⚠️ Failed to intercept GIF result ${index}:`, error.message);
+          // Continue with other results
         }
-      }
-    });
-    
-    resultObserver.observe(container, {
-      childList: true,
-      subtree: true
-    });
+      });
+      
+      // Set up observer for new GIF results that might be added dynamically
+      const resultObserver = new MutationObserver((mutations) => {
+        // Debounce rapid mutations to prevent excessive processing
+        clearTimeout(container._debounceTimer);
+        container._debounceTimer = setTimeout(() => {
+          try {
+            for (const mutation of mutations) {
+              if (mutation.type === 'childList') {
+                const newGifResults = [...mutation.addedNodes].filter(node => 
+                  node.nodeType === Node.ELEMENT_NODE && 
+                  node.classList?.contains('result__2dc39')
+                );
+                
+                newGifResults.forEach((gifResult, index) => {
+                  try {
+                    this.interceptGifResult(gifResult, index);
+                  } catch (error) {
+                    console.log(`🔐 [GIF] ⚠️ Failed to intercept dynamic GIF result ${index}:`, error.message);
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.log('🔐 [GIF] ⚠️ Error processing GIF mutations:', error.message);
+          }
+        }, 100); // 100ms debounce
+      });
+      
+      resultObserver.observe(container, {
+        childList: true,
+        subtree: true
+      });
+      
+      // Store observer for cleanup
+      container._cryptoObserver = resultObserver;
+      
+    } catch (error) {
+      console.log('🔐 [GIF] ⚠️ Failed to intercept GIF picker container:', error.message);
+      // Remove the flag so it can be retried
+      delete container.dataset.cryptoGifIntercepted;
+    }
   }
 
   interceptGifResult(gifResult, index) {
@@ -607,48 +773,59 @@ class DiscordCryptochat {
     
     // console.log('🔐 [GIF] 🔗 Extracted valid tenor URL:', tenorUrl);
     
-    // Remove any existing click listeners and add our interceptor
-    const newGifResult = gifResult.cloneNode(true);
-    gifResult.parentNode.replaceChild(newGifResult, gifResult);
-    
-    newGifResult.addEventListener('click', async (event) => {
-      // console.log('🔐 [GIF] 🎯 GIF clicked! Intercepting...');
-      
-      // Prevent the default Discord behavior
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      
-      // Show visual feedback
-      this.showGifInterceptionFeedback(newGifResult);
-      
-      try {
-        await this.handleGifSelection(tenorUrl);
-      } catch (error) {
-        console.error('🔐 [GIF] ❌ Failed to handle GIF selection:', error);
-        this.showError('Failed to send encrypted GIF');
-      }
-    }, true); // Use capture phase to intercept early
-    
-    // Also intercept any nested clickable elements
-    const clickableElements = newGifResult.querySelectorAll('video, img, div');
-    clickableElements.forEach(element => {
-      element.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
+    // SAFER APPROACH: Add event listeners without cloning/replacing DOM elements
+    // This avoids disrupting React's virtual DOM and prevents crashes
+    try {
+      // Create a wrapper function that safely handles the click
+      const handleGifClick = async (event) => {
+        // console.log('🔐 [GIF] 🎯 GIF clicked! Intercepting...');
         
-        // console.log('🔐 [GIF] 🎯 GIF element clicked! Intercepting...');
-        this.showGifInterceptionFeedback(newGifResult);
-        
+        // Only prevent default if we successfully start the encryption process
         try {
+          // Show visual feedback first
+          this.showGifInterceptionFeedback(gifResult);
+          
+          // Prevent the default Discord behavior AFTER we confirm we can handle it
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          
           await this.handleGifSelection(tenorUrl);
         } catch (error) {
-          console.error('🔐 [GIF] ❌ Failed to handle GIF selection:', error);
+          //console.log('🔐 [GIF] ❌ Failed to handle GIF selection:', error);
           this.showError('Failed to send encrypted GIF');
+          // Don't prevent default on error - let Discord handle it normally
         }
-      }, true);
-    });
+      };
+      
+      // Add the main click listener with passive: false to allow preventDefault
+      gifResult.addEventListener('click', handleGifClick, { 
+        capture: true, // Intercept early 
+        once: false,   // Allow multiple clicks
+        passive: false // Allow preventDefault
+      });
+      
+      // Store the listener reference for cleanup if needed
+      gifResult._cryptoClickHandler = handleGifClick;
+      
+      // Also add listeners to common clickable children, but less aggressively
+      const clickableElements = gifResult.querySelectorAll('video, img');
+      clickableElements.forEach(element => {
+        // Only add if element doesn't already have our handler
+        if (!element._cryptoClickHandler) {
+          element.addEventListener('click', handleGifClick, { 
+            capture: true, 
+            once: false, 
+            passive: false 
+          });
+          element._cryptoClickHandler = handleGifClick;
+        }
+      });
+      
+    } catch (error) {
+      console.log('🔐 [GIF] ⚠️ Failed to add click listeners (non-critical):', error.message);
+      // Don't throw - this is non-critical, GIF picker should still work normally
+    }
   }
 
   extractTenorUrlFromVideo(videoSrc) {
@@ -759,41 +936,71 @@ class DiscordCryptochat {
       // console.log('🔐 [GIF] 💡 3. Then try clicking GIFs from the picker');
       return null;
     } catch (error) {
-      console.error('🔐 [GIF] ❌ Failed to extract tenor URL:', error);
+      //console.log('🔐 [GIF] ❌ Failed to extract tenor URL:', error);
       return null;
     }
   }
 
   showGifInterceptionFeedback(gifElement) {
-    // Add visual feedback to show the GIF was intercepted
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(67, 181, 129, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      color: white;
-      z-index: 1000;
-      border-radius: 8px;
-      font-size: 14px;
-    `;
-    overlay.textContent = '🔐 Encrypting...';
-    
-    gifElement.style.position = 'relative';
-    gifElement.appendChild(overlay);
-    
-    // Remove the overlay after a delay
-    setTimeout(() => {
-      if (overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
-    }, 1500);
+    // SAFER feedback method that doesn't disrupt Discord's DOM structure
+    try {
+      // Create a temporary visual effect without modifying the original element
+      const rect = gifElement.getBoundingClientRect();
+      const overlay = document.createElement('div');
+      overlay.className = 'crypto-gif-feedback'; // Add class for easier cleanup
+      overlay.style.cssText = `
+        position: fixed;
+        top: ${rect.top}px;
+        left: ${rect.left}px;
+        width: ${rect.width}px;
+        height: ${rect.height}px;
+        background: rgba(67, 181, 129, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        z-index: 10000;
+        border-radius: 8px;
+        font-size: 14px;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      `;
+      overlay.textContent = '🔐 Encrypting...';
+      
+      // Append to body instead of modifying the GIF element
+      document.body.appendChild(overlay);
+      
+      // Safely remove after delay with error handling
+      setTimeout(() => {
+        try {
+          if (overlay && overlay.parentNode === document.body) {
+            document.body.removeChild(overlay);
+          }
+        } catch (error) {
+          // Ignore removal errors - overlay may have been cleaned up already
+          console.log('🔐 [GIF] ℹ️ Overlay cleanup - element already removed');
+        }
+      }, 1500);
+      
+      // Also clean up any leftover overlays after 5 seconds (safety net)
+      setTimeout(() => {
+        try {
+          const leftoverOverlays = document.querySelectorAll('.crypto-gif-feedback');
+          leftoverOverlays.forEach(el => {
+            if (el.parentNode) {
+              el.parentNode.removeChild(el);
+            }
+          });
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      }, 5000);
+      
+    } catch (error) {
+      // If feedback fails, just log and continue - don't break the encryption
+      console.log('🔐 [GIF] ⚠️ Feedback display failed (non-critical):', error.message);
+    }
   }
 
   async handleGifSelection(tenorUrl) {
@@ -812,7 +1019,7 @@ class DiscordCryptochat {
     // Find the message input box
     const messageBox = this.findMessageInputBox();
     if (!messageBox) {
-      console.error('🔐 [GIF] ❌ Could not find message input box');
+      //console.log('🔐 [GIF] ❌ Could not find message input box');
       return;
     }
     
@@ -994,7 +1201,7 @@ class DiscordCryptochat {
       // console.log('🔐 [GIF] ✅ Content inserted via clipboard method (identical to text encryption)');
       
     } catch (error) {
-      console.error('🔐 [GIF] ❌ Failed to insert content:', error);
+      //console.log('🔐 [GIF] ❌ Failed to insert content:', error);
       throw error;
     }
   }
@@ -1457,7 +1664,7 @@ class DiscordCryptochat {
       return { processedCount, decryptedCount, skippedCount, totalMessages: messageContainers.length };
       
     } catch (error) {
-      console.error('🔐 [CRYPTO] ❌ Error during message scan:', error);
+      //console.log('🔐 [CRYPTO] ❌ Error during message scan:', error);
       return { processedCount: 0, decryptedCount: 0, skippedCount: 0, totalMessages: 0 };
     }
   }
@@ -1627,7 +1834,7 @@ class DiscordCryptochat {
       messageContent.style.wordWrap = 'break-word';
       
     } catch (error) {
-      console.error('🎨 Message rendering failed, falling back to plain text:', error);
+      //console.log('🎨 Message rendering failed, falling back to plain text:', error);
       messageContent.textContent = decryptedText;
     }
   }
@@ -2075,7 +2282,7 @@ class DiscordCryptochat {
         container.appendChild(this.createLink(url));
       }
     }).catch(error => {
-      console.error('Failed to fetch URL metadata:', error);
+      //console.log('Failed to fetch URL metadata:', error);
       // Fallback to link
       container.innerHTML = '';
       container.style.padding = '8px';
@@ -2106,7 +2313,7 @@ class DiscordCryptochat {
       return this.parseOpenGraphData(html, url);
       
     } catch (error) {
-      console.error('Failed to fetch URL metadata:', error);
+      //console.log('Failed to fetch URL metadata:', error);
       
       // Fallback: try direct URL patterns for known sites
       return this.getKnownSiteMetadata(url);
@@ -2254,7 +2461,7 @@ class DiscordCryptochat {
       return metadata;
       
     } catch (error) {
-      console.error('Failed to parse OpenGraph data:', error);
+      //console.log('Failed to parse OpenGraph data:', error);
       return null;
     }
   }
@@ -2680,7 +2887,7 @@ class DiscordCryptochat {
       return content.trim();
       
     } catch (error) {
-      console.error('🎨 Failed to extract rich message content:', error);
+      //console.log('🎨 Failed to extract rich message content:', error);
       return '';
     }
   }
@@ -3001,7 +3208,7 @@ class DiscordCryptochat {
           }
         }
       } catch (error) {
-        console.error('🔐 [ASYMMETRIC] ❌ Initialization error:', error);
+        //console.log('🔐 [ASYMMETRIC] ❌ Initialization error:', error);
         if (retryCount < maxRetries) {
           setTimeout(attemptInit, 1000);
         }
@@ -3272,7 +3479,7 @@ class DiscordCryptochat {
         keyInfo: keyInfo
       });
     } catch (error) {
-      console.error('🔐 [HANDLER] ❌ Failed to get current key info:', error);
+      //console.log('🔐 [HANDLER] ❌ Failed to get current key info:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3287,7 +3494,7 @@ class DiscordCryptochat {
       const contacts = await window.ecCrypto.getContactList();
       sendResponse(contacts);
     } catch (error) {
-      console.error('Failed to get contact list:', error);
+      //console.log('Failed to get contact list:', error);
       sendResponse([]);
     }
   }
@@ -3302,7 +3509,7 @@ class DiscordCryptochat {
       await window.ecCrypto.clearAllContacts();
       sendResponse({ success: true });
     } catch (error) {
-      console.error('Failed to clear contacts:', error);
+      //console.log('Failed to clear contacts:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3351,7 +3558,7 @@ class DiscordCryptochat {
 
       sendResponse(result);
     } catch (error) {
-      console.error('Failed to test encryption:', error);
+      //console.log('Failed to test encryption:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3398,7 +3605,7 @@ class DiscordCryptochat {
 
       sendResponse(result);
     } catch (error) {
-      console.error('Failed to test decryption:', error);
+      //console.log('Failed to test decryption:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3413,7 +3620,7 @@ class DiscordCryptochat {
       await window.ecCrypto.updateRotationInterval(intervalMs);
       sendResponse({ success: true });
     } catch (error) {
-      console.error('Failed to update EC rotation interval:', error);
+      //console.log('Failed to update EC rotation interval:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3428,7 +3635,7 @@ class DiscordCryptochat {
       await window.ecCrypto.rotateKeysNow();
       sendResponse({ success: true });
     } catch (error) {
-      console.error('Failed to rotate keys:', error);
+      //console.log('Failed to rotate keys:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -3450,7 +3657,7 @@ class DiscordCryptochat {
       sendResponse({ success: true, source: source });
       
     } catch (error) {
-      // console.error('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
+      // //console.log('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
       sendResponse({ success: false, error: error.message, source: source });
     }
   }
@@ -3586,7 +3793,7 @@ window.forceUniqueKeys = async function() {
     // console.log('🔐 [FORCE] Final Key ID:', window.ecCrypto.myKeyId);
     
   } catch (error) {
-    console.error('🔐 [FORCE] Error during force regeneration:', error);
+    //console.log('🔐 [FORCE] Error during force regeneration:', error);
   }
   
   // console.log('🔐 [FORCE] =======================================');
@@ -3614,7 +3821,7 @@ window.fixAfterRotation = async function() {
     // console.log('🔐 [FIX] 💡 Send a test message to rediscover contacts');
     
   } catch (error) {
-    console.error('🔐 [FIX] Error during fix:', error);
+    //console.log('🔐 [FIX] Error during fix:', error);
   }
   
   // console.log('🔐 [FIX] ==============================');
@@ -3640,7 +3847,7 @@ window.cleanupCorruptedContacts = async function() {
     }
     
   } catch (error) {
-    console.error('🔐 [CLEANUP] Error during cleanup:', error);
+    //console.log('🔐 [CLEANUP] Error during cleanup:', error);
   }
   
   // console.log('🔐 [CLEANUP] ================================');

@@ -68,7 +68,7 @@ class PopupManager {
       this.autoEncryptToggleEl.checked = autoEncryptEnabled;
       
     } catch (error) {
-      console.error('Failed to check status:', error);
+      //console.log('Failed to check status:', error);
       this.extensionStatusEl.textContent = 'Error';
       this.extensionIndicatorEl.className = 'status-indicator inactive';
       this.keyStatusEl.textContent = 'Error';
@@ -122,7 +122,7 @@ class PopupManager {
       this.showNotification(`Auto-encrypt ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
       
     } catch (error) {
-      console.error('Failed to toggle auto-encrypt:', error);
+      //console.log('Failed to toggle auto-encrypt:', error);
       this.showNotification('Failed to update setting', 'error');
     }
   }
@@ -174,7 +174,7 @@ class PopupManager {
       this.showNotification(`User set: ${username.trim()}`, 'success');
       
     } catch (error) {
-      console.error('Failed to set user ID:', error);
+      //console.log('Failed to set user ID:', error);
       this.showNotification('Failed to set user ID', 'error');
     }
   }
@@ -208,7 +208,7 @@ class PopupManager {
       }
 
     } catch (error) {
-      console.error('Test failed:', error);
+      //console.log('Test failed:', error);
       this.showNotification('❌ Test failed unexpectedly', 'error');
     } finally {
       this.testEncryptionBtn.textContent = '🧪 Test Encryption';

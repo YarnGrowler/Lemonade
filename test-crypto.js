@@ -118,7 +118,7 @@ async function testSimplifiedCrypto() {
     });
     
   } catch (error) {
-    console.error('🔐 [TEST] ❌ Test failed:', error);
+    //console.log('🔐 [TEST] ❌ Test failed:', error);
   }
 }
 

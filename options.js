@@ -76,6 +76,9 @@ class OptionsManager {
           //console.log('EC keys exist but asymmetric mode is disabled');
         }
       }
+      
+      // Setup asymmetric button listeners in case they're visible
+      this.setupAsymmetricButtonListeners();
     }, 500);
   }
 
@@ -88,7 +91,7 @@ class OptionsManager {
         this.showStatus('Encryption key loaded successfully', 'success');
       }
     } catch (error) {
-      console.error('Failed to load stored key:', error);
+      //console.log('Failed to load stored key:', error);
       this.showStatus('Failed to load stored key', 'error');
     }
   }
@@ -130,45 +133,64 @@ class OptionsManager {
       await this.setupKeyRotation();
     });
 
-    // Sync event listeners
-    this.generateSyncButton.addEventListener('click', async () => {
-      await this.generateSyncCode();
-    });
+    // Sync event listeners (safer checks)
+    if (this.generateSyncButton) {
+      this.generateSyncButton.addEventListener('click', async () => {
+        await this.generateSyncCode();
+      });
+    }
 
-    this.copySyncButton.addEventListener('click', async () => {
-      await this.copySyncCode();
-    });
+    if (this.copySyncButton) {
+      this.copySyncButton.addEventListener('click', async () => {
+        await this.copySyncCode();
+      });
+    }
 
-    this.applySyncButton.addEventListener('click', async () => {
-      await this.applySyncCode();
-    });
+    if (this.applySyncButton) {
+      this.applySyncButton.addEventListener('click', async () => {
+        await this.applySyncCode();
+      });
+    }
 
     // Speed settings event listeners
-    this.saveSpeedButton.addEventListener('click', async () => {
-      await this.saveSpeedSettings();
-    });
+    if (this.saveSpeedButton) {
+      this.saveSpeedButton.addEventListener('click', async () => {
+        await this.saveSpeedSettings();
+      });
+    }
 
-    // Debug event listeners
-    this.debugSyncButton.addEventListener('click', async () => {
-      await this.debugSyncKeys();
-    });
+    // Debug event listeners (safer check)
+    if (this.debugSyncButton) {
+      this.debugSyncButton.addEventListener('click', async () => {
+        await this.debugSyncKeys();
+      });
+    }
 
     // Asymmetric encryption event listeners
-    this.enableAsymmetricCheckbox.addEventListener('change', () => {
-      this.toggleAsymmetricSettings();
-    });
+    if (this.enableAsymmetricCheckbox) {
+      this.enableAsymmetricCheckbox.addEventListener('change', () => {
+        this.toggleAsymmetricSettings();
+      });
+    }
 
-    this.ecRotationIntervalSelect.addEventListener('change', async () => {
-      await this.updateAsymmetricRotationInterval();
-    });
+    if (this.ecRotationIntervalSelect) {
+      this.ecRotationIntervalSelect.addEventListener('change', async () => {
+        await this.updateAsymmetricRotationInterval();
+      });
+    }
 
-    this.rotateKeysButton.addEventListener('click', async () => {
-      await this.rotateKeysManually();
-    });
+    // Use safer event listener setup for buttons that might not exist initially
+    if (this.rotateKeysButton) {
+      this.rotateKeysButton.addEventListener('click', async () => {
+        await this.rotateKeysManually();
+      });
+    }
 
-    this.viewContactsButton.addEventListener('click', async () => {
-      await this.refreshContactsList();
-    });
+    if (this.viewContactsButton) {
+      this.viewContactsButton.addEventListener('click', async () => {
+        await this.refreshContactsList();
+      });
+    }
 
     // New asymmetric features
     document.getElementById('export-public-key')?.addEventListener('click', async () => {
@@ -216,6 +238,76 @@ class OptionsManager {
     document.getElementById('auto-detect-user-id')?.addEventListener('click', async () => {
       await this.autoDetectUserId();
     });
+  }
+
+  // Setup asymmetric button listeners after the section is shown
+  setupAsymmetricButtonListeners() {
+    console.log('🔧 Setting up asymmetric button listeners...');
+    
+    // Re-setup rotate keys button if it wasn't available during initial setup
+    const rotateKeysBtn = document.getElementById('rotate-keys-now');
+    if (rotateKeysBtn) {
+      if (!rotateKeysBtn.hasAttribute('data-listener-attached')) {
+        rotateKeysBtn.addEventListener('click', async () => {
+          await this.rotateKeysManually();
+        });
+        rotateKeysBtn.setAttribute('data-listener-attached', 'true');
+        console.log('🔧 ✅ Rotate Keys button listener attached');
+      } else {
+        console.log('🔧 ⚠️ Rotate Keys button already has listener');
+      }
+    } else {
+      console.log('🔧 ❌ Rotate Keys button not found');
+    }
+
+    // Re-setup view contacts button if it wasn't available during initial setup
+    const viewContactsBtn = document.getElementById('view-contacts');
+    if (viewContactsBtn) {
+      if (!viewContactsBtn.hasAttribute('data-listener-attached')) {
+        viewContactsBtn.addEventListener('click', async () => {
+          await this.refreshContactsList();
+        });
+        viewContactsBtn.setAttribute('data-listener-attached', 'true');
+        console.log('🔧 ✅ View Contacts button listener attached');
+      } else {
+        console.log('🔧 ⚠️ View Contacts button already has listener');
+      }
+    } else {
+      console.log('🔧 ❌ View Contacts button not found');
+    }
+
+    // Make sure export and clear buttons have listeners
+    const exportBtn = document.getElementById('export-public-key');
+    if (exportBtn) {
+      if (!exportBtn.hasAttribute('data-listener-attached')) {
+        exportBtn.addEventListener('click', async () => {
+          await this.exportPublicKey();
+        });
+        exportBtn.setAttribute('data-listener-attached', 'true');
+        console.log('🔧 ✅ Export Public Key button listener attached');
+      } else {
+        console.log('🔧 ⚠️ Export Public Key button already has listener');
+      }
+    } else {
+      console.log('🔧 ❌ Export Public Key button not found');
+    }
+
+    const clearBtn = document.getElementById('clear-all-contacts');
+    if (clearBtn) {
+      if (!clearBtn.hasAttribute('data-listener-attached')) {
+        clearBtn.addEventListener('click', async () => {
+          await this.clearAllContacts();
+        });
+        clearBtn.setAttribute('data-listener-attached', 'true');
+        console.log('🔧 ✅ Clear Contacts button listener attached');
+      } else {
+        console.log('🔧 ⚠️ Clear Contacts button already has listener');
+      }
+    } else {
+      console.log('🔧 ❌ Clear Contacts button not found');
+    }
+    
+    console.log('🔧 Button setup complete');
   }
 
   validateKey() {
@@ -269,7 +361,7 @@ class OptionsManager {
       this.showStatus('✅ Encryption key saved successfully!', 'success');
       
     } catch (error) {
-      console.error('Failed to save key:', error);
+      //console.log('Failed to save key:', error);
       this.showStatus(`Failed to save key: ${error.message}`, 'error');
     } finally {
       this.saveButton.textContent = 'Save Encryption Key';
@@ -298,7 +390,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Test failed:', error);
+      //console.log('Test failed:', error);
       this.showStatus('❌ Encryption test failed unexpectedly', 'error');
     } finally {
       this.testButton.textContent = 'Test Encryption';
@@ -336,7 +428,7 @@ class OptionsManager {
       this.keyFingerprint.textContent = fingerprint;
       this.keyInfo.style.display = 'block';
     } catch (error) {
-      console.error('Failed to generate key fingerprint:', error);
+      //console.log('Failed to generate key fingerprint:', error);
       this.keyInfo.style.display = 'none';
     }
   }
@@ -405,7 +497,7 @@ class OptionsManager {
         this.startRotationStatusUpdates();
       }
     } catch (error) {
-      console.error('Failed to load key rotation settings:', error);
+      //console.log('Failed to load key rotation settings:', error);
     }
   }
 
@@ -479,7 +571,7 @@ class OptionsManager {
       this.showStatus(`✅ Key rotation setup successful! Rotating every ${this.formatInterval(intervalMs)}. Base key cleared from UI for security.`, 'success');
       
     } catch (error) {
-      console.error('Failed to setup key rotation:', error);
+      //console.log('Failed to setup key rotation:', error);
       this.showStatus(`Failed to setup key rotation: ${error.message}`, 'error');
     } finally {
       this.setupRotationButton.textContent = '🔄 Setup Key Rotation';
@@ -534,7 +626,7 @@ class OptionsManager {
         ⏰ Next rotation in: ${nextRotationText}
       `;
     } catch (error) {
-      console.error('Failed to update rotation status:', error);
+      //console.log('Failed to update rotation status:', error);
       this.rotationStatus.textContent = 'Error loading rotation status';
     }
   }
@@ -633,7 +725,7 @@ class OptionsManager {
       this.showSyncStatus(`✅ Sync code generated! Share this with your friend to synchronize rotations.`, 'success');
       
     } catch (error) {
-      console.error('Failed to generate sync code:', error);
+      //console.log('Failed to generate sync code:', error);
       this.showSyncStatus(`❌ Failed to generate sync code: ${error.message}`, 'error');
     } finally {
       this.generateSyncButton.textContent = '📡 Generate Sync Code';
@@ -695,7 +787,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to copy sync code:', error);
+      //console.log('Failed to copy sync code:', error);
       this.syncCodeOutput.select();
       this.showSyncStatus('❌ Copy failed. Please manually copy the selected text (Ctrl+C)', 'error');
     }
@@ -797,7 +889,7 @@ class OptionsManager {
       this.syncCodeInput.value = '';
       
     } catch (error) {
-      console.error('Failed to apply sync code:', error);
+      //console.log('Failed to apply sync code:', error);
       if (error.message.includes('decrypt')) {
         this.showSyncStatus('❌ Invalid sync code or base key mismatch', 'error');
       } else {
@@ -845,7 +937,7 @@ class OptionsManager {
       this.speedStatus.textContent = `Current: ${scanFrequency}ms scan, ${initialDelay}ms initial delay`;
       
     } catch (error) {
-      console.error('Failed to load speed settings:', error);
+      //console.log('Failed to load speed settings:', error);
       this.speedStatus.textContent = 'Failed to load speed settings';
     }
   }
@@ -889,7 +981,7 @@ class OptionsManager {
       }, 3000);
 
     } catch (error) {
-      console.error('Failed to save speed settings:', error);
+      //console.log('Failed to save speed settings:', error);
       this.speedStatus.textContent = `❌ Failed to save speed settings: ${error.message}`;
       this.speedStatus.style.color = '#dc3545';
     } finally {
@@ -938,7 +1030,7 @@ class OptionsManager {
       this.debugOutput.textContent = debugInfo;
 
     } catch (error) {
-      console.error('Debug failed:', error);
+      //console.log('Debug failed:', error);
       this.debugOutput.style.display = 'block';
       this.debugOutput.textContent = `DEBUG ERROR: ${error.message}`;
     } finally {
@@ -1004,7 +1096,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to load asymmetric settings:', error);
+      //console.log('Failed to load asymmetric settings:', error);
     }
   }
 
@@ -1014,6 +1106,12 @@ class OptionsManager {
     
     if (isEnabled) {
       this.enableAsymmetricMode();
+      
+      // Setup button listeners now that the section is visible
+      setTimeout(() => {
+        this.setupAsymmetricButtonListeners();
+      }, 100);
+      
       // Load current key info and contacts immediately, then again after delay
       this.updateCurrentKeyInfo();
       this.refreshContactsList();
@@ -1061,7 +1159,7 @@ class OptionsManager {
       //console.log('Asymmetric encryption enabled');
       
     } catch (error) {
-      console.error('Failed to enable asymmetric mode:', error);
+      //console.log('Failed to enable asymmetric mode:', error);
     }
   }
 
@@ -1088,7 +1186,7 @@ class OptionsManager {
       //console.log('Asymmetric encryption disabled');
       
     } catch (error) {
-      console.error('Failed to disable asymmetric mode:', error);
+      //console.log('Failed to disable asymmetric mode:', error);
     }
   }
 
@@ -1111,46 +1209,69 @@ class OptionsManager {
       //console.log(`EC rotation interval updated to ${intervalMs}ms`);
       
     } catch (error) {
-      console.error('Failed to update EC rotation interval:', error);
+      //console.log('Failed to update EC rotation interval:', error);
     }
   }
 
   async rotateKeysManually() {
+    console.log('🔄 Manual key rotation initiated');
+    
     try {
       this.rotateKeysButton.textContent = 'Rotating...';
       this.rotateKeysButton.disabled = true;
 
       // Try to send rotation command to Discord tabs
       const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      console.log('🔄 Found', tabs.length, 'Discord tabs for manual rotation');
+      
       let rotationSuccess = false;
       
       for (const tab of tabs) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'rotateKeys' });
-          //console.log(`Sent rotation command to tab ${tab.id}`);
+          console.log(`🔄 ✅ Sent rotation command to tab ${tab.id}`);
           rotationSuccess = true;
           break; // Only need one successful command
         } catch (error) {
-          //console.log(`Failed to send rotation command to tab ${tab.id}:`, error);
+          console.log(`🔄 ❌ Failed to send rotation command to tab ${tab.id}:`, error);
           // Try next tab
         }
       }
       
       if (!rotationSuccess) {
         // If no Discord tabs available, show message
+        console.log('🔄 ❌ No Discord tabs responded to rotation command');
         this.showStatus('Please open Discord in a tab to rotate keys', 'error');
         return;
       }
       
       // Wait a moment for rotation to complete, then update display
       setTimeout(async () => {
+        console.log('🔄 Refreshing UI after rotation...');
+        
+        // Check if keys actually changed
+        const beforeKeyInfo = document.getElementById('current-key-id').textContent;
+        console.log('🔄 Key ID before refresh:', beforeKeyInfo);
+        
         await this.updateCurrentKeyInfo();
         await this.refreshContactsList();
-        this.showStatus('Key rotation initiated successfully!', 'success');
-      }, 1000);
+        
+        const afterKeyInfo = document.getElementById('current-key-id').textContent;
+        console.log('🔄 Key ID after refresh:', afterKeyInfo);
+        
+        if (beforeKeyInfo !== afterKeyInfo) {
+          this.showStatus('✅ Key rotation successful! New Key ID: ' + afterKeyInfo, 'success');
+          console.log('🔄 ✅ Key rotation successful - ID changed from', beforeKeyInfo, 'to', afterKeyInfo);
+        } else {
+          this.showStatus('⚠️ Key rotation may have failed - Key ID unchanged', 'error');
+          console.log('🔄 ⚠️ Key rotation may have failed - Key ID unchanged');
+        }
+        
+        console.log('🔄 ✅ Manual rotation complete');
+      }, 2000); // Give it more time
       
     } catch (error) {
-      console.error('Failed to rotate keys:', error);
+      //console.log('Failed to rotate keys:', error);
       this.showStatus('Failed to rotate keys: ' + error.message, 'error');
     } finally {
       this.rotateKeysButton.textContent = '🔄 Rotate Keys Now';
@@ -1186,7 +1307,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to update asymmetric status:', error);
+      //console.log('Failed to update asymmetric status:', error);
       document.getElementById('ec-status-text').textContent = 'Error';
     }
   }
@@ -1239,7 +1360,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to load contacts:', error);
+      //console.log('Failed to load contacts:', error);
       document.getElementById('contact-list-content').textContent = 'Error loading contacts';
     }
   }
@@ -1318,7 +1439,7 @@ class OptionsManager {
       await this.updateCurrentKeyInfo();
       
     } catch (error) {
-      console.error('Failed to refresh contacts:', error);
+      //console.log('Failed to refresh contacts:', error);
       document.getElementById('contact-list-content').innerHTML = '<div style="color: #dc3545; text-align: center; padding: 20px;">Error loading contacts</div>';
     } finally {
       this.viewContactsButton.textContent = '🔄 Refresh';
@@ -1392,7 +1513,7 @@ class OptionsManager {
       await this.updateNextRotationTime(stored);
       
     } catch (error) {
-      console.error('Failed to update current key info:', error);
+      //console.log('Failed to update current key info:', error);
       document.getElementById('current-key-id').textContent = 'Error loading';
       document.getElementById('my-public-key').value = 'Error loading key info';
       document.getElementById('key-created').textContent = 'Error';
@@ -1415,35 +1536,52 @@ class OptionsManager {
         return;
       }
       
-      // TIMESTAMP-BASED ROTATION TIMER (survives page reloads)
-      // Priority: ecLastRotation > ecKeyGenerated > now
-      let baseTimestamp = stored.ecLastRotation || stored.ecKeyGenerated || Date.now();
+      // PROPER EPOCH-BASED ROTATION TIMER
+      // Use the stored epoch timestamp as the absolute reference point
+      console.log('🔍 Stored values:', { 
+        ecRotationEpoch: stored.ecRotationEpoch, 
+        ecLastRotation: stored.ecLastRotation, 
+        ecKeyGenerated: stored.ecKeyGenerated 
+      });
       
-      // If we don't have a last rotation time, set it now for future calculations
-      if (!stored.ecLastRotation) {
-        //console.log('⏰ Setting initial rotation baseline timestamp');
-        await chrome.storage.local.set({ ecLastRotation: baseTimestamp });
+      let rotationEpoch = stored.ecRotationEpoch || stored.ecLastRotation || stored.ecKeyGenerated;
+      
+      if (!rotationEpoch) {
+        // No epoch set yet - set it now and store it
+        rotationEpoch = Date.now();
+        await chrome.storage.local.set({ 
+          ecRotationEpoch: rotationEpoch,
+          ecLastRotation: rotationEpoch 
+        });
+        console.log('⏰ Set new rotation epoch:', new Date(rotationEpoch).toLocaleString());
+      } else {
+        console.log('⏰ Using existing epoch:', new Date(rotationEpoch).toLocaleString());
       }
       
       const now = Date.now();
-      const nextRotationTime = baseTimestamp + intervalMs;
+      
+      // Calculate how many rotation cycles have passed since epoch
+      const timeSinceEpoch = now - rotationEpoch;
+      const cyclesPassed = Math.floor(timeSinceEpoch / intervalMs);
+      
+      // Next rotation is at epoch + (cycles + 1) * interval
+      const nextRotationTime = rotationEpoch + ((cyclesPassed + 1) * intervalMs);
       const timeUntil = nextRotationTime - now;
       
       if (timeUntil > 0) {
         // Show countdown to next rotation
         document.getElementById('next-rotation').textContent = this.formatTime(timeUntil);
-      } else {
-        // Rotation is overdue
-        const overdueBy = Math.abs(timeUntil);
-        document.getElementById('next-rotation').textContent = 'Due for rotation';
         
-        if (overdueBy > 60000) { // More than 1 minute overdue
-          //console.log(`⏰ Key rotation overdue by ${this.formatTime(overdueBy)}`);
-        }
+        // Debug info (remove in production)
+        console.log(`⏰ Epoch: ${new Date(rotationEpoch).toLocaleString()}, Cycles: ${cyclesPassed}, Next: ${new Date(nextRotationTime).toLocaleString()}, Until: ${this.formatTime(timeUntil)}`);
+      } else {
+        // This shouldn't happen with proper epoch calculation, but just in case
+        document.getElementById('next-rotation').textContent = 'Due for rotation';
+        console.log('⏰ WARNING: Rotation appears overdue - this should not happen with epoch-based timing');
       }
       
     } catch (error) {
-      console.error('Failed to update next rotation time:', error);
+      //console.log('Failed to update next rotation time:', error);
       document.getElementById('next-rotation').textContent = 'Error';
     }
   }
@@ -1470,38 +1608,50 @@ class OptionsManager {
       }, 2000);
       
     } catch (error) {
-      console.error('Failed to export public key:', error);
+      //console.log('Failed to export public key:', error);
       this.showStatus('Failed to copy public key', 'error');
     }
   }
 
   async clearAllContacts() {
+    console.log('🗑️ Clear Contacts button clicked!');
+    
     const confirmed = confirm('Are you sure you want to clear all discovered contacts? This action cannot be undone.');
     
-    if (!confirmed) return;
+    if (!confirmed) {
+      console.log('🗑️ User cancelled contact clearing');
+      return;
+    }
     
     try {
+      console.log('🗑️ Clearing contacts from storage...');
       // Clear contacts directly in storage
       await chrome.storage.local.set({ ecUserKeys: {} });
+      console.log('🗑️ Contacts cleared from storage');
       
       // Also try to notify Discord tabs to clear their in-memory cache
       const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      console.log('🗑️ Found', tabs.length, 'Discord tabs to notify');
+      
       for (const tab of tabs) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'clearAllContacts' });
+          console.log('🗑️ Notified tab', tab.id);
         } catch (error) {
-          // Ignore tab communication errors, storage clear is what matters
+          console.log('🗑️ Could not notify tab', tab.id, '- this is OK');
         }
       }
       
       // Refresh the display immediately
+      console.log('🗑️ Refreshing UI...');
       await this.refreshContactsList();
       await this.updateCurrentKeyInfo(); // This will update the contact count too
       
       this.showStatus('All contacts cleared successfully', 'success');
+      console.log('🗑️ Contact clearing completed successfully');
       
     } catch (error) {
-      console.error('Failed to clear contacts:', error);
+      //console.log('Failed to clear contacts:', error);
       this.showStatus('Failed to clear contacts: ' + error.message, 'error');
     }
   }
@@ -1537,7 +1687,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to test encryption:', error);
+      //console.log('Failed to test encryption:', error);
       document.getElementById('encrypted-result').value = 'Error: ' + error.message;
     }
   }
@@ -1574,7 +1724,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to test decryption:', error);
+      //console.log('Failed to test decryption:', error);
       document.getElementById('decrypted-result').value = 'Error: ' + error.message;
     }
   }
@@ -1622,7 +1772,7 @@ class OptionsManager {
       }, 100);
       
     } catch (error) {
-      console.error('Failed to update asymmetric rotation interval:', error);
+      //console.log('Failed to update asymmetric rotation interval:', error);
       this.showStatus('Failed to update rotation interval', 'error');
     }
   }
@@ -1690,7 +1840,7 @@ class OptionsManager {
       
     } catch (error) {
       debugLog.value += `❌ Debug failed: ${error.message}\n`;
-      console.error('Debug key status error:', error);
+      //console.log('Debug key status error:', error);
     }
   }
 
@@ -1749,7 +1899,7 @@ class OptionsManager {
       
     } catch (error) {
       debugLog.value += `❌ Force unique keys failed: ${error.message}\n`;
-      console.error('Force unique keys error:', error);
+      //console.log('Force unique keys error:', error);
     }
   }
 
@@ -1807,7 +1957,7 @@ class OptionsManager {
       
     } catch (error) {
       debugLog.value += `❌ Fix after rotation failed: ${error.message}\n`;
-      console.error('Fix after rotation error:', error);
+      //console.log('Fix after rotation error:', error);
     }
   }
 
@@ -1871,7 +2021,7 @@ class OptionsManager {
       
     } catch (error) {
       debugLog.value += `❌ Cleanup temp contacts failed: ${error.message}\n`;
-      console.error('Cleanup temp contacts error:', error);
+      //console.log('Cleanup temp contacts error:', error);
     }
   }
 
@@ -1887,11 +2037,14 @@ class OptionsManager {
         return;
       }
       
-      // Reset the timer to start from now
+      // Reset the epoch to now - this is the proper way to reset an epoch-based timer
       await chrome.storage.local.set({
+        ecRotationEpoch: currentTime,
         ecLastRotation: currentTime,
         ecKeyGenerated: currentTime // Also ensure key generation time is set
       });
+      
+      console.log('⏰ Rotation epoch reset to:', new Date(currentTime).toLocaleString());
       
       // Update display immediately
       await this.updateCurrentKeyInfo();
@@ -1899,7 +2052,7 @@ class OptionsManager {
       this.showStatus(`Timer reset! Next rotation in ${this.formatInterval(stored.ecRotationInterval)}`, 'success');
       
     } catch (error) {
-      console.error('Failed to reset rotation timer:', error);
+      //console.log('Failed to reset rotation timer:', error);
       this.showStatus('Failed to reset timer: ' + error.message, 'error');
     }
   }
@@ -1955,7 +2108,7 @@ class OptionsManager {
       this.showStatus('✅ User ID set successfully! This should fix message decryption issues.', 'success');
       
     } catch (error) {
-      console.error('Failed to set user ID:', error);
+      //console.log('Failed to set user ID:', error);
       this.showStatus('Failed to set user ID: ' + error.message, 'error');
     }
   }
@@ -1995,7 +2148,7 @@ class OptionsManager {
       this.showStatus('❌ Could not auto-detect User ID. Please set it manually.', 'error');
       
     } catch (error) {
-      console.error('Failed to auto-detect user ID:', error);
+      //console.log('Failed to auto-detect user ID:', error);
       this.showStatus('Failed to auto-detect user ID: ' + error.message, 'error');
     }
   }
@@ -2016,7 +2169,7 @@ class OptionsManager {
       }
       
     } catch (error) {
-      console.error('Failed to update user display:', error);
+      //console.log('Failed to update user display:', error);
     }
   }
 }
@@ -2104,4 +2257,59 @@ class DiscordCrypto {
 // Initialize when the page loads
 document.addEventListener('DOMContentLoaded', () => {
   new OptionsManager();
-}); 
+});
+
+// Debug function to test key rotation
+window.testKeyRotation = async function() {
+  console.log('🧪 Testing key rotation functionality...');
+  
+  try {
+    // Get current key info from storage
+    const before = await chrome.storage.local.get(['ecMyKeyId', 'ecStaticPublicKey', 'ecKeyGenerated']);
+    console.log('🧪 Before rotation:');
+    console.log('  Key ID:', before.ecMyKeyId);
+    console.log('  Key Generated:', before.ecKeyGenerated ? new Date(before.ecKeyGenerated).toLocaleString() : 'Unknown');
+    console.log('  Public Key:', before.ecStaticPublicKey ? before.ecStaticPublicKey.substring(0, 50) + '...' : 'None');
+    
+    // Try to send rotation command to Discord tabs
+    const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+    console.log('🧪 Found', tabs.length, 'Discord tabs');
+    
+    if (tabs.length === 0) {
+      console.log('🧪 ❌ No Discord tabs found - please open Discord first');
+      return;
+    }
+    
+    // Send rotation command
+    const tab = tabs[0];
+    console.log('🧪 Sending rotation command to tab', tab.id);
+    
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'rotateKeys' });
+    console.log('🧪 Rotation response:', response);
+    
+    // Wait a moment then check if keys changed
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const after = await chrome.storage.local.get(['ecMyKeyId', 'ecStaticPublicKey', 'ecKeyGenerated']);
+    console.log('🧪 After rotation:');
+    console.log('  Key ID:', after.ecMyKeyId);
+    console.log('  Key Generated:', after.ecKeyGenerated ? new Date(after.ecKeyGenerated).toLocaleString() : 'Unknown');
+    console.log('  Public Key:', after.ecStaticPublicKey ? after.ecStaticPublicKey.substring(0, 50) + '...' : 'None');
+    
+    // Compare
+    if (before.ecMyKeyId !== after.ecMyKeyId) {
+      console.log('🧪 ✅ SUCCESS: Key ID changed from', before.ecMyKeyId, 'to', after.ecMyKeyId);
+    } else {
+      console.log('🧪 ❌ FAILED: Key ID unchanged -', before.ecMyKeyId);
+    }
+    
+    if (before.ecStaticPublicKey !== after.ecStaticPublicKey) {
+      console.log('🧪 ✅ SUCCESS: Public key changed');
+    } else {
+      console.log('🧪 ❌ FAILED: Public key unchanged');
+    }
+    
+  } catch (error) {
+    //console.log('🧪 Test failed:', error);
+  }
+}; 
