@@ -1,6 +1,7 @@
 /**
- * Discord Cryptochat - Options Page Logic
- * Handles encryption key management and testing
+ * Lemonade - Discord Encryption
+ * Options Page Logic - Handles encryption key management and testing
+ * 🍋 Sweet & Secure Discord Encryption
  */
 
 class OptionsManager {
@@ -38,6 +39,12 @@ class OptionsManager {
     this.saveSpeedButton = document.getElementById('save-speed-settings');
     this.speedStatus = document.getElementById('speed-status');
 
+    // Language settings elements
+    this.stealthLanguageSelect = document.getElementById('stealth-language');
+    this.languagePreview = document.getElementById('language-preview');
+    this.saveLanguageButton = document.getElementById('save-language-settings');
+    this.languageStatus = document.getElementById('language-status');
+
     // Debug elements
     this.debugSyncButton = document.getElementById('debug-sync');
     this.debugOutput = document.getElementById('debug-output');
@@ -58,6 +65,7 @@ class OptionsManager {
     await this.loadStoredKey();
     await this.loadKeyRotationSettings();
     await this.loadSpeedSettings();
+    await this.loadLanguageSettings();
     await this.loadAsymmetricSettings();
     await this.updateCurrentUserDisplay(); // Load current user ID info
     this.setupEventListeners();
@@ -120,18 +128,24 @@ class OptionsManager {
       this.validateKey();
     });
 
-    // Key rotation event listeners
-    this.enableRotationCheckbox.addEventListener('change', () => {
-      this.toggleRotationSettings();
-    });
+    // Key rotation event listeners (safer checks)
+    if (this.enableRotationCheckbox) {
+      this.enableRotationCheckbox.addEventListener('change', () => {
+        this.toggleRotationSettings();
+      });
+    }
 
-    this.rotationIntervalSelect.addEventListener('change', () => {
-      this.handleIntervalChange();
-    });
+    if (this.rotationIntervalSelect) {
+      this.rotationIntervalSelect.addEventListener('change', () => {
+        this.handleIntervalChange();
+      });
+    }
 
-    this.setupRotationButton.addEventListener('click', async () => {
-      await this.setupKeyRotation();
-    });
+    if (this.setupRotationButton) {
+      this.setupRotationButton.addEventListener('click', async () => {
+        await this.setupKeyRotation();
+      });
+    }
 
     // Sync event listeners (safer checks)
     if (this.generateSyncButton) {
@@ -238,6 +252,37 @@ class OptionsManager {
     document.getElementById('auto-detect-user-id')?.addEventListener('click', async () => {
       await this.autoDetectUserId();
     });
+
+    // Language settings event listeners
+    console.log('🎭 Setting up language event listeners...');
+    console.log('🎭 saveLanguageButton found:', !!this.saveLanguageButton);
+    console.log('🎭 stealthLanguageSelect found:', !!this.stealthLanguageSelect);
+    
+    if (this.saveLanguageButton) {
+      this.saveLanguageButton.addEventListener('click', async (e) => {
+        e.preventDefault();
+        console.log('🎭 Save language button clicked!');
+        try {
+          await this.saveLanguageSettings();
+        } catch (error) {
+          console.error('🎭 Error saving language settings:', error);
+          this.showLanguageStatus('Error saving language settings: ' + error.message, 'error');
+        }
+      });
+      console.log('🎭 ✅ Save language button listener attached');
+    } else {
+      console.error('🎭 ❌ Save language button not found!');
+    }
+
+    if (this.stealthLanguageSelect) {
+      this.stealthLanguageSelect.addEventListener('change', () => {
+        console.log('🎭 Language selection changed');
+        this.updateLanguagePreview();
+      });
+      console.log('🎭 ✅ Language select listener attached');
+    } else {
+      console.error('🎭 ❌ Language select not found!');
+    }
   }
 
   // Setup asymmetric button listeners after the section is shown
@@ -1536,49 +1581,19 @@ class OptionsManager {
         return;
       }
       
-      // PROPER EPOCH-BASED ROTATION TIMER
-      // Use the stored epoch timestamp as the absolute reference point
-      console.log('🔍 Stored values:', { 
-        ecRotationEpoch: stored.ecRotationEpoch, 
-        ecLastRotation: stored.ecLastRotation, 
-        ecKeyGenerated: stored.ecKeyGenerated 
-      });
+      // Simple time difference calculation - just show how long since key was created
+      const keyCreatedTime = stored.ecKeyGenerated || stored.ecLastRotation;
       
-      let rotationEpoch = stored.ecRotationEpoch || stored.ecLastRotation || stored.ecKeyGenerated;
-      
-      if (!rotationEpoch) {
-        // No epoch set yet - set it now and store it
-        rotationEpoch = Date.now();
-        await chrome.storage.local.set({ 
-          ecRotationEpoch: rotationEpoch,
-          ecLastRotation: rotationEpoch 
-        });
-        console.log('⏰ Set new rotation epoch:', new Date(rotationEpoch).toLocaleString());
-      } else {
-        console.log('⏰ Using existing epoch:', new Date(rotationEpoch).toLocaleString());
+      if (!keyCreatedTime) {
+        document.getElementById('next-rotation').textContent = 'No key timing info';
+        return;
       }
       
       const now = Date.now();
+      const timeSinceCreated = now - keyCreatedTime;
       
-      // Calculate how many rotation cycles have passed since epoch
-      const timeSinceEpoch = now - rotationEpoch;
-      const cyclesPassed = Math.floor(timeSinceEpoch / intervalMs);
-      
-      // Next rotation is at epoch + (cycles + 1) * interval
-      const nextRotationTime = rotationEpoch + ((cyclesPassed + 1) * intervalMs);
-      const timeUntil = nextRotationTime - now;
-      
-      if (timeUntil > 0) {
-        // Show countdown to next rotation
-        document.getElementById('next-rotation').textContent = this.formatTime(timeUntil);
-        
-        // Debug info (remove in production)
-        console.log(`⏰ Epoch: ${new Date(rotationEpoch).toLocaleString()}, Cycles: ${cyclesPassed}, Next: ${new Date(nextRotationTime).toLocaleString()}, Until: ${this.formatTime(timeUntil)}`);
-      } else {
-        // This shouldn't happen with proper epoch calculation, but just in case
-        document.getElementById('next-rotation').textContent = 'Due for rotation';
-        console.log('⏰ WARNING: Rotation appears overdue - this should not happen with epoch-based timing');
-      }
+      // Simply show time since key creation
+      document.getElementById('next-rotation').textContent = this.formatTime(timeSinceCreated) + ' ago';
       
     } catch (error) {
       //console.log('Failed to update next rotation time:', error);
@@ -2170,6 +2185,249 @@ class OptionsManager {
       
     } catch (error) {
       //console.log('Failed to update user display:', error);
+    }
+  }
+
+  // ==================== LANGUAGE SETTINGS METHODS ====================
+
+  async loadLanguageSettings() {
+    console.log('🎭 Loading language settings...');
+    
+    try {
+      const stored = await chrome.storage.local.get(['stealthLanguage']);
+      const currentLanguage = stored.stealthLanguage || 'chinese';
+      console.log('🎭 Loaded language from storage:', currentLanguage);
+      
+      if (this.stealthLanguageSelect) {
+        this.stealthLanguageSelect.value = currentLanguage;
+        console.log('🎭 Set select value to:', currentLanguage);
+        this.updateLanguagePreview();
+        console.log('🎭 ✅ Language settings loaded successfully');
+      } else {
+        console.error('🎭 ❌ Language select element not found during load');
+      }
+      
+    } catch (error) {
+      console.error('🎭 ❌ Failed to load language settings:', error);
+    }
+  }
+
+  async saveLanguageSettings() {
+    console.log('🎭 saveLanguageSettings function called!');
+    
+    try {
+      if (!this.stealthLanguageSelect) {
+        throw new Error('Language select element not found');
+      }
+      
+      const selectedLanguage = this.stealthLanguageSelect.value;
+      console.log('🎭 Selected language:', selectedLanguage);
+      
+      if (!selectedLanguage) {
+        throw new Error('No language selected');
+      }
+      
+      console.log('🎭 Saving to storage...');
+      await chrome.storage.local.set({
+        stealthLanguage: selectedLanguage
+      });
+      console.log('🎭 ✅ Saved to storage successfully');
+
+      // Notify all Discord tabs about the language change
+      try {
+        console.log('🎭 Querying Discord tabs...');
+        const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+        console.log('🎭 Found', tabs.length, 'Discord tabs');
+        
+        for (const tab of tabs) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, {
+              action: 'updateLanguageSettings',
+              language: selectedLanguage
+            });
+            console.log('🎭 ✅ Notified tab', tab.id);
+          } catch (tabError) {
+            console.log('🎭 ⚠️ Could not notify tab', tab.id, ':', tabError.message);
+          }
+        }
+      } catch (tabError) {
+        // Tab messaging might fail, but settings are still saved
+        console.log('🎭 ⚠️ Tab messaging failed:', tabError);
+      }
+      
+      const languageName = this.getLanguageName(selectedLanguage);
+      console.log('🎭 Language name:', languageName);
+      
+      this.showLanguageStatus('🎭 Language settings saved! Your encrypted messages will now appear in ' + languageName, 'success');
+      console.log('🎭 ✅ Language settings save completed successfully!');
+      
+    } catch (error) {
+      console.error('🎭 ❌ Failed to save language settings:', error);
+      this.showLanguageStatus('Failed to save language settings: ' + error.message, 'error');
+    }
+  }
+
+  updateLanguagePreview() {
+    console.log('🎭 updateLanguagePreview called');
+    console.log('🎭 languagePreview element:', !!this.languagePreview);
+    console.log('🎭 stealthLanguageSelect element:', !!this.stealthLanguageSelect);
+    
+    if (!this.languagePreview || !this.stealthLanguageSelect) {
+      console.error('🎭 ❌ Missing elements for preview update');
+      return;
+    }
+    
+    const selectedLanguage = this.stealthLanguageSelect.value;
+    console.log('🎭 Selected language for preview:', selectedLanguage);
+    const testMessage = "Hello World!";
+    
+    try {
+      // Create a preview of how the message would look
+      const encodedPreview = this.previewLanguageEncoding(testMessage, selectedLanguage);
+      console.log('🎭 Generated preview:', encodedPreview);
+      
+      this.languagePreview.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-weight: bold; color: #00b894;">Original:</div>
+          <div style="background: rgba(255, 255, 255, 0.5); padding: 8px; border-radius: 4px; font-family: monospace;">${testMessage}</div>
+          <div style="font-weight: bold; color: #fd79a8;">Appears as:</div>
+          <div style="background: rgba(255, 255, 255, 0.5); padding: 8px; border-radius: 4px; font-family: monospace; font-size: 16px; line-height: 1.4;">${encodedPreview}</div>
+        </div>
+      `;
+      console.log('🎭 ✅ Preview updated successfully');
+      
+    } catch (error) {
+      console.error('🎭 ❌ Error generating preview:', error);
+      this.languagePreview.textContent = 'Error generating preview: ' + error.message;
+    }
+  }
+
+  previewLanguageEncoding(text, language) {
+    // Simple preview generation (not actual encryption, just demonstration)
+    const base64Sample = btoa(text); // Simple base64 for preview
+    
+    switch (language) {
+      case 'chinese':
+        return this.sampleUnicodeEncoding(base64Sample, 0x4E00);
+      case 'arabic':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0600);
+      case 'japanese':
+        return this.sampleUnicodeEncoding(base64Sample, 0x3040);
+      case 'korean':
+        return this.sampleUnicodeEncoding(base64Sample, 0xAC00);
+      case 'russian':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0400);
+      case 'thai':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0E00);
+
+      case 'hindi':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0900);
+      case 'greek':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0370);
+      case 'georgian':
+        return this.sampleUnicodeEncoding(base64Sample, 0x10A0);
+      case 'armenian':
+        return this.sampleUnicodeEncoding(base64Sample, 0x0530);
+      case 'amharic':
+        return this.sampleUnicodeEncoding(base64Sample, 0x1200);
+      case 'morse':
+        return this.sampleMorseEncoding(base64Sample);
+      case 'braille':
+        return this.sampleBrailleEncoding(base64Sample);
+      case 'binary':
+        return this.sampleBinaryEncoding(base64Sample);
+      case 'invisible':
+        return "👻 (This text would be invisible - uses zero-width characters)";
+      default:
+        return this.sampleUnicodeEncoding(base64Sample, 0x4E00);
+    }
+  }
+
+  sampleUnicodeEncoding(base64, baseCharCode) {
+    let result = '';
+    for (let i = 0; i < Math.min(base64.length, 12); i++) {
+      const charCode = base64.charCodeAt(i);
+      const encodedCharCode = baseCharCode + (charCode - 32);
+      result += String.fromCharCode(encodedCharCode);
+    }
+    return result + (base64.length > 12 ? '...' : '');
+  }
+
+  sampleMorseEncoding(base64) {
+    const morseTable = {
+      'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+      'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+      'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+      'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+      'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---'
+    };
+    
+    let result = '';
+    for (let i = 0; i < Math.min(base64.length, 8); i++) {
+      const char = base64[i].toUpperCase();
+      if (morseTable[char]) {
+        result += morseTable[char] + ' ';
+      }
+    }
+    return result.trim() + (base64.length > 8 ? ' ...' : '');
+  }
+
+  sampleBrailleEncoding(base64) {
+    let result = '';
+    for (let i = 0; i < Math.min(base64.length, 10); i++) {
+      const charCode = base64.charCodeAt(i);
+      const brailleCode = 0x2800 + (charCode - 32);
+      result += String.fromCharCode(brailleCode);
+    }
+    return result + (base64.length > 10 ? '...' : '');
+  }
+
+  sampleBinaryEncoding(base64) {
+    let result = '';
+    for (let i = 0; i < Math.min(base64.length, 4); i++) {
+      const charCode = base64.charCodeAt(i);
+      const binary = charCode.toString(2).padStart(8, '0');
+      result += binary + ' ';
+    }
+    return result.trim() + (base64.length > 4 ? ' ...' : '');
+  }
+
+  getLanguageName(languageCode) {
+    const names = {
+      chinese: '🇨🇳 Chinese',
+      arabic: '🇸🇦 Arabic',
+      japanese: '🇯🇵 Japanese',
+      korean: '🇰🇷 Korean',
+      russian: '🇷🇺 Russian',
+      thai: '🇹🇭 Thai',
+      hindi: '🇮🇳 Hindi',
+      greek: '🇬🇷 Greek',
+      georgian: '🇬🇪 Georgian',
+      armenian: '🇦🇲 Armenian',
+      amharic: '🇪🇹 Amharic',
+      morse: '📡 Morse Code',
+      braille: '👆 Braille',
+      binary: '💻 Binary',
+      invisible: '👻 Invisible Characters'
+    };
+    
+    return names[languageCode] || names.chinese;
+  }
+
+  showLanguageStatus(message, type) {
+    if (!this.languageStatus) return;
+    
+    this.languageStatus.textContent = message;
+    this.languageStatus.className = `status ${type}`;
+    this.languageStatus.style.display = 'block';
+    
+    // Auto-hide after 5 seconds for success messages
+    if (type === 'success') {
+      setTimeout(() => {
+        if (this.languageStatus) {
+          this.languageStatus.style.display = 'none';
+        }
+      }, 5000);
     }
   }
 }

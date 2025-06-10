@@ -1,6 +1,7 @@
 /**
- * Discord Cryptochat - Popup Logic
- * Handles extension status display and quick actions
+ * Lemonade - Discord Encryption
+ * Popup Logic - Handles extension status display and quick actions
+ * 🍋 Sweet & Secure Discord Encryption
  */
 
 class PopupManager {

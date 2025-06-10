@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Cryptochat</title>
+    <title>Lemonade - Discord Encryption</title>
     <style>
         * {
             margin: 0;
@@ -12,42 +12,60 @@
         }
 
         body {
-            width: 320px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            width: 360px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 50%, #e17055 100%);
+            color: #2d3436;
+            overflow: hidden;
         }
 
         .popup-container {
-            padding: 20px;
+            padding: 24px;
+            position: relative;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
         }
 
         .logo {
-            font-size: 32px;
+            font-size: 36px;
             margin-bottom: 8px;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         .title {
-            font-size: 18px;
-            font-weight: 600;
+            font-size: 24px;
+            font-weight: 700;
             margin-bottom: 4px;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .subtitle {
-            font-size: 12px;
-            opacity: 0.8;
+            font-size: 13px;
+            color: #636e72;
+            font-weight: 500;
         }
 
         .status-section {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
             margin-bottom: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(10px);
         }
 
@@ -55,85 +73,115 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(116, 185, 255, 0.1);
         }
 
         .status-item:last-child {
             margin-bottom: 0;
+            border-bottom: none;
         }
 
         .status-label {
             font-size: 14px;
-            opacity: 0.9;
+            font-weight: 600;
+            color: #2d3436;
         }
 
         .status-value {
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
+            color: #00b894;
         }
 
         .status-indicator {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             margin-left: 8px;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
         }
 
         .status-indicator.active {
-            background: #48bb78;
-            box-shadow: 0 0 8px rgba(72, 187, 120, 0.6);
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            box-shadow: 0 0 12px rgba(0, 184, 148, 0.4);
         }
 
         .status-indicator.inactive {
-            background: #ff6b6b;
-            box-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            box-shadow: 0 0 12px rgba(232, 67, 147, 0.4);
         }
 
         .button {
             width: 100%;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.2);
+            padding: 14px 20px;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 8px;
-            backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 12px;
+            box-shadow: 0 4px 16px rgba(253, 203, 110, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(253, 203, 110, 0.4);
+        }
+
+        .button:active {
+            transform: translateY(0);
         }
 
         .button:last-child {
             margin-bottom: 0;
         }
 
+        .button.secondary {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            box-shadow: 0 4px 16px rgba(116, 185, 255, 0.3);
+        }
+
+        .button.secondary:hover {
+            box-shadow: 0 8px 24px rgba(116, 185, 255, 0.4);
+        }
+
         .usage-info {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 16px;
             margin-top: 16px;
             font-size: 12px;
-            text-align: center;
-            opacity: 0.8;
+            text-align: left;
+            color: #636e72;
+            line-height: 1.5;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .usage-info strong {
+            color: #2d3436;
+            font-weight: 700;
         }
 
         .divider {
             height: 1px;
-            background: rgba(255, 255, 255, 0.2);
-            margin: 16px 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            margin: 20px 0;
         }
 
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 48px;
-            height: 24px;
+            width: 52px;
+            height: 28px;
             margin-left: 12px;
         }
 
@@ -150,38 +198,51 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(255, 255, 255, 0.3);
+            background: linear-gradient(45deg, #ddd, #bbb);
             transition: 0.3s;
-            border-radius: 24px;
+            border-radius: 28px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
+            height: 22px;
+            width: 22px;
             left: 3px;
             bottom: 3px;
-            background-color: white;
+            background: white;
             transition: 0.3s;
             border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         input:checked + .toggle-slider {
-            background-color: #48bb78;
+            background: linear-gradient(45deg, #00b894, #00cec9);
         }
 
         input:checked + .toggle-slider:before {
             transform: translateX(24px);
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
         }
     </style>
 </head>
 <body>
     <div class="popup-container">
         <div class="header">
-            <div class="logo">🔐</div>
-            <div class="title">Discord Cryptochat</div>
-            <div class="subtitle">Secure messaging for Discord • v<span id="version">1.2.0</span></div>
+            <div class="logo">🍋</div>
+            <div class="title">Lemonade</div>
+            <div class="subtitle">Sweet & Secure Discord Encryption <span class="version-badge">v1.0.0</span></div>
         </div>
 
         <div class="status-section">
@@ -225,23 +286,22 @@
             ⚙️ Open Settings
         </button>
 
-        <button id="set-user-id" class="button">
+        <button id="set-user-id" class="button secondary">
             👤 Set User ID
         </button>
 
-        <button id="test-encryption" class="button">
+        <button id="test-encryption" class="button secondary">
             🧪 Test Encryption
-        </button>
-
-        <button id="view-changelog" class="button">
-            📄 What's New
         </button>
 
         <div class="divider"></div>
 
         <div class="usage-info">
-            💡 Toggle <strong>Auto-Encrypt</strong> to automatically encrypt all messages, or type <strong>!priv</strong> for individual messages<br>
-            ⌨️ Hotkeys: <strong>Ctrl+Shift+E</strong> (toggle auto-encrypt), <strong>Ctrl+Shift+D</strong> (toggle extension)
+            <strong>🍋 Quick Start:</strong><br>
+            • Toggle <strong>Auto-Encrypt</strong> to encrypt all messages automatically<br>
+            • Type <strong>!priv</strong> before any message for manual encryption<br>
+            • Use <strong>Ctrl+Shift+E</strong> to toggle auto-encrypt<br>
+            • Use <strong>Ctrl+Shift+D</strong> to toggle extension on/off
         </div>
     </div>
 

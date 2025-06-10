@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Discord Cryptochat (SecureDM)",
-  "version": "2.0.0",
-  "description": "End-to-end encryption for Discord messages between trusted users",
+  "name": "Lemonade - Discord Encryption",
+  "version": "1.0.0",
+  "description": "🍋 Sweet & secure end-to-end encryption for Discord. Keep your conversations private with beautiful, seamless protection.",
   "permissions": [
     "storage",
     "activeTab",
@@ -21,7 +21,7 @@
         "https://discord.com/*",
         "https://*.discord.com/*"
       ],
-      "js": ["crypto.js", "ec-crypto.js", "ec-message-processor.js", "asymmetric-content.js", "debug-asymmetric.js", "content.js"],
+      "js": ["crypto.js", "ec-crypto.js", "ec-message-processor.js", "asymmetric-content.js", "content.js"],
       "css": ["style.css"],
               "run_at": "document_start"
     }
@@ -32,7 +32,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Discord Cryptochat Settings"
+    "default_title": "Lemonade Settings"
   },
   "icons": {
     "16": "icons/icon16.png",

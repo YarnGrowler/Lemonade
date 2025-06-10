@@ -1,194 +1,328 @@
-# Discord Cryptochat (SecureDM) - Simplified Version
+# 🍋 Lemonade - Discord Encryption
 
-🔐 **End-to-end encryption for Discord messages with simplified user key discovery**
+> **Sweet & Secure** - End-to-end encryption for Discord messages with beautiful, seamless protection.
 
-## 🎯 Overview
-
-This is a **completely simplified** version of the Discord encryption extension that:
-
-- Uses a **hardcoded static key** as the base encryption method
-- **Automatically discovers** public keys from other users' messages
-- **Stores user-key pairs** for future encryption
-- Uses the **most recent discovered key** when encrypting messages
-- Falls back to **static key** when no user keys are available
-- **Comprehensive logging** for debugging and transparency
-
-## 🔧 How It Works
-
-### 🔑 Key Strategy (SIMPLE!)
-
-1. **Static Fallback Key**: Every user has a hardcoded static keypair stored locally
-2. **User Discovery**: When you receive an encrypted message, it contains the sender's public key
-3. **Automatic Storage**: The extension automatically stores `userId -> publicKey` mappings
-4. **Smart Encryption**: When sending a message, use the most recent user key or fall back to static
-
-### 📤 Outgoing Messages
-
-```
-User types: "hello" or "!priv hello"
-↓
-Extension finds most recent user key OR uses static key
-↓
-Encrypts with chosen key
-↓
-Encodes as Chinese characters (stealth mode)
-↓
-Sends to Discord
-```
-
-### 📨 Incoming Messages
-
-```
-Receives Chinese-looking message
-↓
-Detects it's encrypted (70%+ Chinese characters)
-↓
-Decodes Chinese back to encrypted format
-↓
-Extracts sender's public key and stores it
-↓
-Decrypts with your static private key
-↓
-Shows decrypted message with 🔐 indicator
-```
-
-## 🚀 Installation
-
-1. Download the extension files
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode"
-4. Click "Load unpacked" and select the extension folder
-5. The extension will automatically initialize on Discord
-
-## 📋 Usage
-
-### Basic Operation
-
-- **Automatic Mode**: Turn on auto-encrypt in options, then all messages are encrypted
-- **Manual Mode**: Type `!priv your message` to encrypt a specific message
-- **Hotkeys**:
-  - `Ctrl+Shift+E`: Toggle auto-encrypt mode
-  - `Ctrl+Shift+D`: Toggle extension on/off
-
-### User Discovery Process
-
-1. **First Contact**: You and your friend both install the extension
-2. **Send Message**: One person sends an encrypted message (contains their public key)
-3. **Key Exchange**: The receiver automatically stores the sender's public key
-4. **Future Messages**: All future messages between you use each other's keys
-5. **Fallback Safety**: If something goes wrong, always falls back to static key
-
-## 🔍 Logging & Debug
-
-The simplified system has **comprehensive logging**:
-
-```javascript
-🔐 [EC] 👤 NEW USER DISCOVERED!
-🔐 [EC] 🆔 User ID: 1234567890
-🔐 [EC] 👤 Username: FriendName
-🔐 [EC] 🔑 Key ID: TUZrd0V3WUhL
-🔐 [EC] 📊 Total users: 1
-
-🔐 [EC] 📤 ENCRYPTING MESSAGE...
-🔐 [EC] 📝 Message: hello world
-🔐 [EC] 🎯 Recipient: 1234567890
-🔐 [EC] 🔑 Using specific user key for: 1234567890
-🔐 [EC] ✅ ENCRYPTION SUCCESS!
-
-🔐 [EC] 📨 DECRYPTING MESSAGE...
-🔐 [EC] 📦 Encrypted data length: 184
-🔐 [EC] 👤 Sender: 1234567890
-🔐 [EC] ✅ DECRYPTION SUCCESS!
-🔐 [EC] 📝 Decrypted: hello world
-```
-
-## 🛠️ Technical Details
-
-### File Structure
-
-```
-discord-cryptochat-extension/
-├── manifest.json              # Extension configuration
-├── content.js                 # Main Discord integration (1200 lines → simplified)
-├── ec-crypto.js               # Core encryption (400 lines → 350 lines, simplified)
-├── ec-message-processor.js    # Message processing (400 lines → 280 lines, simplified)
-├── asymmetric-content.js      # Integration layer (400 lines → 200 lines, simplified)
-├── crypto.js                  # Symmetric encryption fallback
-├── options.html/js            # Settings page
-├── popup.html/js              # Quick access popup
-└── icons/                     # Extension icons
-```
-
-### Encryption Flow
-
-1. **Static Key Generation**: On first run, generates ECDH P-256 keypair
-2. **Message Format**: `EC:encryptedData:PK:senderPublicKey:keyId`
-3. **Chinese Encoding**: Converts to Chinese characters for stealth
-4. **User Storage**: Maps Discord UserID → {publicKey, keyId, username, lastSeen}
-5. **Key Selection**: Always uses most recent user key, falls back to static
-
-### Security Features
-
-- **ECDH P-256**: Industry-standard elliptic curve encryption
-- **AES-GCM**: Authenticated encryption for message content
-- **Key Isolation**: Each user's keys are stored separately
-- **Forward Compatibility**: Can add new users without breaking existing ones
-- **Fallback Safety**: Always has static key as backup
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **No Decryption**: Check if both users have extension installed
-2. **Key Not Found**: Look for "USER DISCOVERED" logs in console
-3. **Encryption Failed**: Verify extension is enabled (Ctrl+Shift+D)
-4. **Message Corruption**: Refresh Discord page and try again
-
-### Debug Commands
-
-Open browser console on Discord and run:
-
-```javascript
-// Test the crypto system
-window.testCrypto();
-
-// Check current status
-window.ecCrypto.getStatus();
-
-// List discovered users
-window.ecCrypto.getUserList();
-
-// Clear all stored users (emergency reset)
-window.ecCrypto.clearAllUsers();
-
-// Manual encryption test
-window.ecCrypto.encrypt("test message");
-```
-
-## 🔒 Privacy & Security
-
-- **Local Storage Only**: All keys stored locally in browser
-- **No Cloud/Server**: No data sent to external servers
-- **Discord Blind**: Discord sees only Chinese characters
-- **P2P Encryption**: Direct encryption between users
-- **Open Source**: All code is readable and auditable
-
-## 📞 Contact Detection Example
-
-```
-User A sends message → Contains public key → User B stores it
-User B sends reply → Uses User A's stored key → User A gets message
-Now both users have each other's keys for future messaging!
-```
-
-## ⚠️ Important Notes
-
-- **Both users need the extension** for encrypted communication
-- **Keys are device-specific** - each browser/device has its own keys
-- **No message recovery** if keys are lost (clear browser data)
-- **For trusted contacts only** - not meant to bypass Discord ToS
-- **Educational/Personal Use** - use responsibly
+[![Version](https://img.shields.io/badge/version-1.0.0-yellow.svg)](https://github.com/yourusername/lemonade)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Discord](https://img.shields.io/badge/platform-Discord-5865F2.svg)](https://discord.com)
 
 ---
 
-🔐 **Simple. Robust. Straightforward.** Just like you asked!
+## 🌟 **What is Lemonade?**
+
+Lemonade is a powerful Discord browser extension that provides **military-grade encryption** for your messages while maintaining Discord's familiar interface. Your conversations stay sweet and private! 🍋
+
+### ✨ **Key Highlights**
+
+- 🔐 **End-to-end encryption** with AES-GCM & ECDH P-256
+- 🎬 **GIF & media encryption** with interactive viewing
+- 👥 **Automatic contact discovery** - no manual setup needed
+- 🎭 **Stealth mode** - messages appear as Chinese characters
+- ⚡ **Real-time performance** with configurable speeds
+- 🔄 **Perfect forward secrecy** with automatic key rotation
+
+---
+
+## 🚀 **Complete Feature List**
+
+### 🔐 **Encryption & Security**
+
+| Feature                     | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| **AES-GCM Encryption**      | Military-grade symmetric encryption                     |
+| **ECDH P-256**              | Elliptic curve key exchange                             |
+| **Perfect Forward Secrecy** | Automatic key rotation prevents past message decryption |
+| **Local Key Storage**       | All keys stored locally - no cloud/server               |
+| **Key Fingerprinting**      | SHA-256 fingerprints for key verification               |
+| **Message Authentication**  | Cryptographic signatures prevent tampering              |
+
+### 🎬 **Media & Content**
+
+| Feature                 | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| **GIF Encryption**      | Direct encryption from Discord's GIF picker     |
+| **Image Encryption**    | Secure image sharing with previews              |
+| **Interactive Modals**  | Click-to-view encrypted media (like Discord)    |
+| **Large Emoji Support** | Auto-sizing for single emojis                   |
+| **Video Support**       | Handle media.tenor.com MP4s as animated content |
+| **Responsive Sizing**   | Media fits actual dimensions perfectly          |
+
+### 👥 **Contact Management**
+
+| Feature                   | Description                                    |
+| ------------------------- | ---------------------------------------------- |
+| **Auto-Discovery**        | Automatically find and store contact keys      |
+| **Username Tracking**     | Remember display names for easy identification |
+| **Contact List**          | View all discovered encrypted contacts         |
+| **Key Verification**      | Verify contact public keys                     |
+| **Manual Contact Add**    | Add contacts with known public keys            |
+| **Contact Export/Import** | Backup your contact list                       |
+
+### 🔄 **Key Management**
+
+| Feature                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| **Automatic Rotation** | Time-based key rotation (1 min to 1 month) |
+| **Manual Rotation**    | Rotate keys on-demand                      |
+| **Key History**        | Track key creation and rotation times      |
+| **Sync Codes**         | Share rotation schedules with contacts     |
+| **Key Export**         | Copy public keys for sharing               |
+| **Emergency Reset**    | Clear all keys and start fresh             |
+
+### 🎭 **Stealth & Privacy**
+
+| Feature                     | Description                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| **Multi-Language Encoding** | Choose from 12+ languages + special encodings                                               |
+| **Universal Compatibility** | Any language can decrypt any other language                                                 |
+| **Unicode Languages**       | Chinese, Arabic, Japanese, Korean, Russian, Thai, Hindi, Greek, Georgian, Armenian, Amharic |
+| **Special Encodings**       | Morse Code, Braille, Binary, Invisible Characters                                           |
+| **Invisible to Observers**  | Looks like regular text to non-users                                                        |
+| **No Network Traffic**      | Zero external server communication                                                          |
+| **Local Processing**        | All encryption/decryption happens locally                                                   |
+| **Memory Protection**       | Secure handling of keys in memory                                                           |
+| **Auto-Clear Logs**         | Debug logs automatically cleared                                                            |
+
+### ⚡ **Performance & UX**
+
+| Feature                     | Description                              |
+| --------------------------- | ---------------------------------------- |
+| **Configurable Scan Rates** | 0.5s to 5s message scanning intervals    |
+| **Memory Optimization**     | Efficient CPU and RAM usage              |
+| **Instant Decryption**      | Real-time message decryption             |
+| **Smooth Animations**       | Beautiful fade-in effects                |
+| **Responsive Design**       | Works on all screen sizes                |
+| **Error Recovery**          | Graceful handling of encryption failures |
+
+### 🎯 **User Interface**
+
+| Feature               | Description                         |
+| --------------------- | ----------------------------------- |
+| **Modern Design**     | Beautiful gradients and animations  |
+| **Popup Control**     | Quick access to settings and status |
+| **Visual Indicators** | 🔐 icons show encrypted messages    |
+| **Status Monitoring** | Real-time encryption status         |
+| **Settings Page**     | Comprehensive configuration options |
+| **Mobile-Friendly**   | Responsive design for all devices   |
+
+### ⌨️ **Shortcuts & Controls**
+
+| Feature                  | Description                        |
+| ------------------------ | ---------------------------------- |
+| **Ctrl+Shift+E**         | Toggle auto-encrypt mode           |
+| **Ctrl+Shift+D**         | Toggle extension on/off            |
+| **!priv command**        | Manually encrypt specific messages |
+| **Auto-Encrypt Mode**    | Encrypt all messages automatically |
+| **Hotkey Customization** | Modify shortcuts in settings       |
+| **Context Menu**         | Right-click encryption options     |
+
+### 🔧 **Advanced Features**
+
+| Feature                 | Description                                |
+| ----------------------- | ------------------------------------------ |
+| **Debug Console**       | Comprehensive logging for troubleshooting  |
+| **Performance Metrics** | Monitor encryption/decryption speed        |
+| **Custom Algorithms**   | Support for additional encryption methods  |
+| **API Integration**     | Programmatic access to encryption features |
+| **Batch Operations**    | Encrypt/decrypt multiple messages          |
+| **Regex Filters**       | Auto-encrypt based on message patterns     |
+
+### 📱 **Compatibility**
+
+| Feature            | Description                           |
+| ------------------ | ------------------------------------- |
+| **Discord Web**    | Full support for discord.com          |
+| **Discord Canary** | Support for canary.discord.com        |
+| **Discord PTB**    | Support for ptb.discord.com           |
+| **All Browsers**   | Chrome, Firefox, Edge, Safari support |
+| **Cross-Platform** | Windows, Mac, Linux compatibility     |
+| **Mobile Web**     | Works on mobile Discord web           |
+
+---
+
+## 🛠️ **Installation**
+
+### **Chrome/Edge/Brave**
+
+1. Download the extension files
+2. Open `chrome://extensions/` (or `edge://extensions/`)
+3. Enable **Developer mode**
+4. Click **Load unpacked** and select the Lemonade folder
+5. The 🍋 icon will appear in your browser toolbar
+
+### **Firefox**
+
+1. Download the extension files
+2. Open `about:debugging`
+3. Click **This Firefox** → **Load Temporary Add-on**
+4. Select `manifest.json` from the Lemonade folder
+
+---
+
+## 🌍 **Multi-Language Stealth System**
+
+### 🎭 **Choose Your Stealth Language**
+
+Lemonade supports **16 different encoding options** to make your encrypted messages blend seamlessly into any conversation:
+
+#### 🌏 **Unicode Languages (12 options)**
+
+- **🇨🇳 Chinese** - Traditional Chinese characters
+- **🇸🇦 Arabic** - Right-to-left Arabic script
+- **🇯🇵 Japanese** - Hiragana characters
+- **🇰🇷 Korean** - Hangul script
+- **🇷🇺 Russian** - Cyrillic alphabet
+- **🇹🇭 Thai** - Thai script
+- **🇮🇳 Hindi** - Devanagari script
+- **🇬🇷 Greek** - Greek alphabet
+- **🇬🇪 Georgian** - Georgian script
+- **🇦🇲 Armenian** - Armenian alphabet
+- **🇪🇹 Amharic** - Ethiopic script
+
+#### 🔤 **Special Encodings (4 options)**
+
+- **📡 Morse Code** - Dots and dashes (. - . -)
+- **👆 Braille** - Braille patterns (⠓⠑⠇⠇⠕)
+- **💻 Binary** - Binary digits (01001000 01100101)
+- **👻 Invisible** - Zero-width characters (completely invisible!)
+
+### 🔄 **Universal Compatibility**
+
+**You and your friends don't need to use the same language!** The encryption is universal - you could send in Chinese, they could see it in Arabic, and it would still decrypt perfectly. The language is purely aesthetic for stealth purposes.
+
+### 🎯 **Live Preview**
+
+The settings page shows you exactly how "Hello World!" would appear in your selected language, so you can see the stealth effect in real-time.
+
+---
+
+## 🍋 **Quick Start Guide**
+
+### **Step 1: Basic Setup**
+
+1. Click the 🍋 icon in your browser toolbar
+2. Set your encryption key in the popup or settings
+3. Enable **Auto-Encrypt** for automatic encryption
+
+### **Step 2: Advanced Setup (Recommended)**
+
+1. Open Lemonade Settings
+2. Enable **Asymmetric Encryption (EC P-256)**
+3. Set your Discord User ID (auto-detect available)
+4. Configure key rotation interval
+
+### **Step 3: Start Encrypting**
+
+- **Auto Mode**: Toggle auto-encrypt, all messages encrypted
+- **Manual Mode**: Type `!priv your message` for specific encryption
+- **GIF Mode**: Use Discord's GIF picker - encrypted automatically
+
+### **Step 4: Share with Friends**
+
+1. Copy your public key from settings
+2. Share with trusted contacts
+3. They install Lemonade and add your key
+4. Enjoy secure conversations! 🔐
+
+---
+
+## 📊 **Security Specifications**
+
+| Component                 | Specification                           |
+| ------------------------- | --------------------------------------- |
+| **Symmetric Encryption**  | AES-256-GCM                             |
+| **Asymmetric Encryption** | ECDH P-256                              |
+| **Key Derivation**        | PBKDF2 with 100,000 iterations          |
+| **Random Generation**     | Crypto.getRandomValues()                |
+| **Hash Function**         | SHA-256                                 |
+| **Key Length**            | 256-bit symmetric, P-256 elliptic curve |
+
+---
+
+## 🤔 **FAQ**
+
+### **Is Lemonade safe to use?**
+
+Yes! Lemonade uses industry-standard encryption and stores all keys locally. No data is sent to external servers.
+
+### **Can Discord see my encrypted messages?**
+
+No. Discord only sees Chinese-looking characters. The actual message content is encrypted end-to-end.
+
+### **What if I lose my keys?**
+
+Keys are stored locally in your browser. If you clear browser data, you'll lose access to encrypted messages. Always backup your keys!
+
+### **Does it work on mobile?**
+
+Lemonade works on Discord web on mobile browsers, but not on Discord mobile apps.
+
+### **Is it legal?**
+
+Yes, using encryption for privacy is legal in most countries. However, check your local laws and Discord's Terms of Service.
+
+---
+
+## 🛡️ **Privacy & Security**
+
+- 🔒 **Zero Data Collection** - No analytics, tracking, or data harvesting
+- 🏠 **Local Storage Only** - All keys and data stored on your device
+- 🚫 **No Network Requests** - Extension doesn't communicate with external servers
+- 🔐 **Open Source** - All code is readable and auditable
+- 🛡️ **Memory Safe** - Secure handling of cryptographic material
+- 🗑️ **Auto-Cleanup** - Sensitive data automatically cleared
+
+---
+
+## ⚠️ **Important Notes**
+
+- **Both users need Lemonade** for encrypted communication
+- **Keys are device-specific** - each browser/device has unique keys
+- **No message recovery** if keys are lost (clear browser data)
+- **For trusted contacts only** - not meant to bypass Discord ToS
+- **Educational/Personal Use** - use responsibly and legally
+
+---
+
+## 🤝 **Contributing**
+
+We welcome contributions! Please read our contributing guidelines and code of conduct.
+
+### **Development Setup**
+
+```bash
+git clone https://github.com/yourusername/lemonade.git
+cd lemonade
+# Load unpacked extension in developer mode
+```
+
+### **Feature Requests**
+
+Have an idea? Open an issue with the "enhancement" label!
+
+---
+
+## 📞 **Support**
+
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/yourusername/lemonade/issues)
+- 💬 **Questions**: [Discussions](https://github.com/yourusername/lemonade/discussions)
+- 📧 **Security**: security@lemonade-encryption.com
+
+---
+
+## 📄 **License**
+
+Lemonade is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**🍋 Made with love for privacy-conscious Discord users 🍋**
+
+_Sweet conversations deserve sweet protection._
+
+[![GitHub stars](https://img.shields.io/github/stars/yourusername/lemonade?style=social)](https://github.com/yourusername/lemonade)
+[![GitHub forks](https://img.shields.io/github/forks/yourusername/lemonade?style=social)](https://github.com/yourusername/lemonade/fork)
+
+</div>

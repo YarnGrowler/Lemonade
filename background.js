@@ -1,19 +1,20 @@
 /**
- * Discord Cryptochat - Background Script
- * Handles extension lifecycle and message passing
+ * Lemonade - Discord Encryption
+ * Background Script - Handles extension lifecycle and message passing
+ * 🍋 Sweet & Secure Discord Encryption
  */
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    //console.log('Discord Cryptochat extension installed');
+    //console.log('Lemonade extension installed');
     
     // Open options page on first install
     chrome.tabs.create({
       url: chrome.runtime.getURL('options.html')
     });
   } else if (details.reason === 'update') {
-    //console.log('Discord Cryptochat extension updated');
+    //console.log('Lemonade extension updated');
   }
 });
 
@@ -55,7 +56,7 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-//console.log('Discord Cryptochat background script loaded');
+//console.log('Lemonade background script loaded');
 
 // ==================== KEY ROTATION MONITORING ====================
 

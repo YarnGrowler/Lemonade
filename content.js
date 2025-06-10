@@ -1,6 +1,7 @@
 /**
- * Discord Cryptochat - Content Script
- * Handles message interception and encryption/decryption
+ * Lemonade - Discord Encryption
+ * Content Script - Handles message interception and encryption/decryption
+ * 🍋 Sweet & Secure Discord Encryption
  */
 
 // Simple console logging only
@@ -407,6 +408,24 @@ class DiscordCryptochat {
           await this.ecCrypto.setCurrentUser(request.userId, request.username);
           // console.log('🔐 [EC] 👤 Current user updated:', request.username, '(ID:', request.userId + ')');
         }
+        sendResponse({ success: true });
+        return true;
+      } else if (request.action === 'detectCurrentUser') {
+        // Auto-detect current Discord user from DOM
+        try {
+          const userInfo = this.detectDiscordUserFromDOM();
+          sendResponse(userInfo);
+        } catch (error) {
+          sendResponse({ error: error.message });
+        }
+        return true;
+      } else if (request.action === 'updateLanguageSettings') {
+        // Language settings updated from options page
+        console.log('🎭 [LANGUAGE] Language settings updated, clearing cache and reloading');
+        
+        // Clear any cached language settings if needed
+        this.cachedStealthLanguage = null;
+        
         sendResponse({ success: true });
         return true;
       }
@@ -1032,47 +1051,57 @@ class DiscordCryptochat {
     // Try asymmetric encryption first - BUT ONLY IF ENABLED
     const ecSettings = await chrome.storage.local.get(['ecEnabled']);
     if (ecSettings.ecEnabled && this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
+      console.log('🔐 [GIF] 🔐 Asymmetric encryption enabled - trying asymmetric first...');
       try {
-        // console.log('🔐 [GIF] 🔐 Trying asymmetric encryption...');
-                 const asymmetricResult = await this.encryptAsymmetricMessage(tenorUrl);
+        const asymmetricResult = await this.encryptAsymmetricMessage(tenorUrl);
         if (asymmetricResult && asymmetricResult.success) {
           encryptedMessage = asymmetricResult.encryptedText;
           encryptionMethod = 'asymmetric';
-          // console.log('🔐 [GIF] ✅ Asymmetric encryption success - length:', encryptedMessage.length);
+          console.log('🔐 [GIF] ✅ Asymmetric encryption SUCCESS! Length:', encryptedMessage.length);
         } else {
-          // console.log('🔐 [GIF] ❌ Asymmetric encryption failed, trying symmetric...');
+          console.log('🔐 [GIF] ❌ Asymmetric encryption failed - falling back to symmetric...');
         }
       } catch (error) {
-        // console.log('🔐 [GIF] ❌ Asymmetric encryption error:', error.message);
+        console.log('🔐 [GIF] ❌ Asymmetric encryption error - falling back to symmetric:', error.message);
       }
     } else if (!ecSettings.ecEnabled) {
-      // console.log('🔐 [GIF] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
+      console.log('🔐 [GIF] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
+    } else {
+      console.log('🔐 [GIF] ⚠️ Asymmetric encryption not available - using symmetric only');
     }
     
-    // Fallback to symmetric encryption if asymmetric failed
-    if (!encryptedMessage && this.encryptionKey) {
+    // Fallback to symmetric encryption if asymmetric failed or wasn't attempted
+    if (!encryptedMessage) {
+      if (!this.encryptionKey) {
+        console.log('🔐 [GIF] ❌ No symmetric encryption key available - cannot encrypt');
+        this.showError('No encryption key set! Please configure encryption key in options.');
+        return;
+      }
+      
+      console.log('🔐 [GIF] 🔑 Falling back to symmetric encryption...');
       try {
-        // console.log('🔐 [GIF] 🔐 Trying symmetric encryption...');
         const discordCrypto = new DiscordCrypto();
-                 const symmetricResult = await discordCrypto.encrypt(tenorUrl, this.encryptionKey);
+        const symmetricResult = await discordCrypto.encrypt(tenorUrl, this.encryptionKey);
         if (symmetricResult) {
-          encryptedMessage = this.encodeStealthMessage(symmetricResult);
+          encryptedMessage = await this.encodeStealthMessage(symmetricResult);
           encryptionMethod = 'symmetric';
-          // console.log('🔐 [GIF] ✅ Symmetric encryption success - length:', encryptedMessage.length);
+          console.log('🔐 [GIF] ✅ Symmetric encryption SUCCESS! Length:', encryptedMessage.length);
+        } else {
+          console.log('🔐 [GIF] ❌ Symmetric encryption returned null result');
         }
       } catch (error) {
-        // console.log('🔐 [GIF] ❌ Symmetric encryption error:', error.message);
+        console.log('🔐 [GIF] ❌ Symmetric encryption error:', error.message);
       }
     }
     
-    // If no encryption worked, show error
+    // Final check - if no encryption method worked, show error
     if (!encryptedMessage) {
-      // console.log('🔐 [GIF] ❌ No encryption method available or all failed');
-      this.showError('Unable to encrypt GIF - no encryption key available');
+      console.log('🔐 [GIF] ❌ All encryption methods failed - cannot encrypt GIF');
+      this.showError('Failed to encrypt GIF - please check your encryption settings');
       return;
     }
     
-    // console.log('🔐 [GIF] ✅ Encrypted GIF URL using:', encryptionMethod);
+    console.log('🔐 [GIF] ✅ GIF encrypted successfully using:', encryptionMethod);
     
     // Insert the encrypted message
     await this.insertMessageContent(messageBox, encryptedMessage);
@@ -1412,32 +1441,32 @@ class DiscordCryptochat {
       // Try asymmetric encryption first if available - BUT ONLY IF ENABLED
       const ecSettings = await chrome.storage.local.get(['ecEnabled']);
       if (ecSettings.ecEnabled && this.encryptAsymmetricMessage && typeof this.encryptAsymmetricMessage === 'function') {
-        // console.log('🔐 [ENCRYPT] 🔐 Trying asymmetric encryption...');
+        console.log('🔐 [ENCRYPT] 🔐 Asymmetric encryption enabled - trying asymmetric first...');
         try {
           const asymmetricResult = await this.encryptAsymmetricMessage(actualMessage);
           if (asymmetricResult && asymmetricResult.success) {
             encryptedMessage = asymmetricResult.encryptedText;
             encryptionMethod = 'asymmetric';
             encryptionDetails = asymmetricResult.details || {};
-            // console.log('🔐 [ENCRYPT] ✅ Asymmetric encryption SUCCESS!');
-            // console.log('🔐 [ENCRYPT] Details:', encryptionDetails);
-            // console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+            console.log('🔐 [ENCRYPT] ✅ Asymmetric encryption SUCCESS!');
+            console.log('🔐 [ENCRYPT] Details:', encryptionDetails);
+            console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
           } else {
-            // console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption failed, trying symmetric...');
+            console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption failed - falling back to symmetric...');
           }
         } catch (asymmetricError) {
-          // console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error:', asymmetricError.message);
+          console.log('🔐 [ENCRYPT] ❌ Asymmetric encryption error - falling back to symmetric:', asymmetricError.message);
         }
       } else if (!ecSettings.ecEnabled) {
-        // console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
+        console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption disabled by user - using symmetric only');
       } else {
-        // console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available');
+        console.log('🔐 [ENCRYPT] ⚠️ Asymmetric encryption not available - using symmetric only');
       }
 
-      // Fallback to symmetric encryption if asymmetric failed or unavailable
+      // Fallback to symmetric encryption if asymmetric failed or wasn't attempted
       if (!encryptedMessage) {
         if (!this.encryptionKey) {
-          // console.log('🔐 [ENCRYPT] ❌ No symmetric encryption key available');
+          console.log('🔐 [ENCRYPT] ❌ No symmetric encryption key available - cannot encrypt');
           event.preventDefault();
           event.stopPropagation();
           this.showKeyWarning();
@@ -1445,15 +1474,34 @@ class DiscordCryptochat {
           return;
         }
         
-        // console.log('🔐 [ENCRYPT] 🔑 Using symmetric encryption...');
-        encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
-        encryptionMethod = 'symmetric';
-        encryptionDetails = { keyType: 'shared_secret' };
-        // console.log('🔐 [ENCRYPT] ✅ Symmetric encryption SUCCESS!');
-        // console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+        console.log('🔐 [ENCRYPT] 🔑 Falling back to symmetric encryption...');
+        try {
+          encryptedMessage = await discordCrypto.encrypt(actualMessage, this.encryptionKey);
+          if (encryptedMessage) {
+            encryptionMethod = 'symmetric';
+            encryptionDetails = { keyType: 'shared_secret' };
+            console.log('🔐 [ENCRYPT] ✅ Symmetric encryption SUCCESS!');
+            console.log('🔐 [ENCRYPT] Encrypted length:', encryptedMessage.length);
+          } else {
+            console.log('🔐 [ENCRYPT] ❌ Symmetric encryption returned null result');
+          }
+        } catch (symmetricError) {
+          console.log('🔐 [ENCRYPT] ❌ Symmetric encryption error:', symmetricError.message);
+        }
       }
 
-      const finalMessage = encryptionMethod === 'asymmetric' ? encryptedMessage : this.encodeStealthMessage(encryptedMessage);
+      // Final check - if no encryption method worked, show error
+      if (!encryptedMessage) {
+        console.log('🔐 [ENCRYPT] ❌ All encryption methods failed - cannot encrypt message');
+        event.preventDefault();
+        event.stopPropagation();
+        this.showError('Failed to encrypt message - please check your encryption settings');
+        this.isProcessingMessage = false;
+        return;
+      }
+
+      console.log('🔐 [ENCRYPT] ✅ Message encrypted successfully using:', encryptionMethod);
+      const finalMessage = encryptionMethod === 'asymmetric' ? encryptedMessage : await this.encodeStealthMessage(encryptedMessage);
       
       // Focus the message box
       messageBox.focus();
@@ -1779,7 +1827,7 @@ class DiscordCryptochat {
         // console.log('🔐 [DECRYPT] 🔑 Trying symmetric decryption...');
         try {
           // Decode the stealth message to get base64
-          const encryptedPayload = this.decodeStealthMessage(messageText);
+          const encryptedPayload = await this.decodeStealthMessage(messageText);
           // Decrypt the message using symmetric encryption
           decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
           decryptionMethod = 'symmetric';
@@ -3310,17 +3358,36 @@ class DiscordCryptochat {
   }
 
   // Stealth encoding methods
-  encodeStealthMessage(base64Data) {
-    // Convert base64 to Chinese characters to make it look natural
-    const chineseChars = this.base64ToChinese(base64Data);
-    // Add spaces every 4-6 characters for natural appearance
-    return this.addSpacesToChinese(chineseChars);
+  async encodeStealthMessage(base64Data) {
+    // Convert base64 to selected stealth language to make it look natural
+    const stealthText = await this.base64ToStealthText(base64Data);
+    // Add spaces for natural appearance
+    return this.addSpacesToText(stealthText);
   }
 
-  decodeStealthMessage(chineseText) {
-    // Remove spaces first, then convert Chinese characters back to base64
-    const cleanChinese = this.removeSpacesFromChinese(chineseText);
-    return this.chineseToBase64(cleanChinese);
+  async decodeStealthMessage(stealthText) {
+    // Remove spaces first, then convert stealth text back to base64
+    const cleanText = this.removeSpacesFromText(stealthText);
+    return await this.stealthTextToBase64(cleanText);
+  }
+
+  addSpacesToText(text) {
+    // Add spaces every 4-6 characters with some randomness for natural look
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      result += text[i];
+      // Add space every 4-6 characters (varying for natural appearance)
+      const spaceInterval = 4 + (i % 3); // Creates pattern of 4,5,6,4,5,6...
+      if ((i + 1) % spaceInterval === 0 && i < text.length - 1) {
+        result += ' ';
+      }
+    }
+    return result;
+  }
+
+  removeSpacesFromText(text) {
+    // Simply remove all spaces
+    return text.replace(/\s+/g, '');
   }
 
   addSpacesToChinese(chineseText) {
@@ -3342,46 +3409,198 @@ class DiscordCryptochat {
     return chineseText.replace(/\s+/g, '');
   }
 
-  base64ToChinese(base64) {
-    // Take base64 string and convert each character to a Chinese character using simple, reversible mapping
+  // ==================== MULTI-LANGUAGE STEALTH ENCODING ====================
+
+  async getStealthLanguage() {
+    try {
+      const result = await chrome.storage.local.get(['stealthLanguage']);
+      return result.stealthLanguage || 'chinese';
+    } catch (error) {
+      return 'chinese';
+    }
+  }
+
+  getLanguageConfig(language) {
+    const configs = {
+      chinese: {
+        name: '🇨🇳 Chinese',
+        baseCharCode: 0x4E00,
+        range: 94,
+        detector: (char) => char >= 0x4E00 && char <= 0x7000
+      },
+      arabic: {
+        name: '🇸🇦 Arabic',
+        baseCharCode: 0x0600,
+        range: 94,
+        detector: (char) => char >= 0x0600 && char <= 0x06FF
+      },
+      japanese: {
+        name: '🇯🇵 Japanese',
+        baseCharCode: 0x3040,
+        range: 94,
+        detector: (char) => char >= 0x3040 && char <= 0x309F
+      },
+      korean: {
+        name: '🇰🇷 Korean',
+        baseCharCode: 0xAC00,
+        range: 94,
+        detector: (char) => char >= 0xAC00 && char <= 0xD7AF
+      },
+      russian: {
+        name: '🇷🇺 Russian',
+        baseCharCode: 0x0400,
+        range: 94,
+        detector: (char) => char >= 0x0400 && char <= 0x04FF
+      },
+      thai: {
+        name: '🇹🇭 Thai',
+        baseCharCode: 0x0E00,
+        range: 94,
+        detector: (char) => char >= 0x0E00 && char <= 0x0E7F
+      },
+     
+      hindi: {
+        name: '🇮🇳 Hindi',
+        baseCharCode: 0x0900,
+        range: 94,
+        detector: (char) => char >= 0x0900 && char <= 0x097F
+      },
+      greek: {
+        name: '🇬🇷 Greek',
+        baseCharCode: 0x0370,
+        range: 94,
+        detector: (char) => char >= 0x0370 && char <= 0x03FF
+      },
+      georgian: {
+        name: '🇬🇪 Georgian',
+        baseCharCode: 0x10A0,
+        range: 94,
+        detector: (char) => char >= 0x10A0 && char <= 0x10FF
+      },
+      armenian: {
+        name: '🇦🇲 Armenian',
+        baseCharCode: 0x0530,
+        range: 94,
+        detector: (char) => char >= 0x0530 && char <= 0x058F
+      },
+      amharic: {
+        name: '🇪🇹 Amharic',
+        baseCharCode: 0x1200,
+        range: 94,
+        detector: (char) => char >= 0x1200 && char <= 0x137F
+      }
+    };
+    
+    return configs[language] || configs.chinese;
+  }
+
+  getSpecialEncodingConfig(encoding) {
+    const configs = {
+      morse: {
+        name: '📡 Morse Code',
+        encoder: this.encodeToMorse.bind(this),
+        decoder: this.decodeFromMorse.bind(this),
+        detector: (text) => /^[.\-\s]+$/.test(text.trim()) && text.length > 10
+      },
+      braille: {
+        name: '👆 Braille',
+        encoder: this.encodeToBraille.bind(this),
+        decoder: this.decodeFromBraille.bind(this),
+        detector: (text) => /^[⠀-⣿\s]+$/.test(text.trim()) && text.length > 5
+      },
+      binary: {
+        name: '💻 Binary',
+        encoder: this.encodeToBinary.bind(this),
+        decoder: this.decodeFromBinary.bind(this),
+        detector: (text) => /^[01\s]+$/.test(text.trim()) && text.length > 20
+      },
+      invisible: {
+        name: '👻 Invisible',
+        encoder: this.encodeToInvisible.bind(this),
+        decoder: this.decodeFromInvisible.bind(this),
+        detector: (text) => /^[\u200B\u200C\u200D\u2060\uFEFF\s]+$/.test(text)
+      }
+    };
+    
+    return configs[encoding];
+  }
+
+  async base64ToStealthText(base64) {
+    const language = await this.getStealthLanguage();
+    
+    // Check for special encodings first
+    const specialConfig = this.getSpecialEncodingConfig(language);
+    if (specialConfig) {
+      return specialConfig.encoder(base64);
+    }
+    
+    // Regular unicode language encoding
+    const config = this.getLanguageConfig(language);
     let result = '';
-    const baseCharCode = 0x4E00; // Start of CJK unified ideographs
     
     for (let i = 0; i < base64.length; i++) {
       const charCode = base64.charCodeAt(i);
-      // Simple direct mapping - just add the char code to base
-      const chineseCharCode = baseCharCode + (charCode - 32); // Shift printable ASCII range (32-126) to Chinese range
-      result += String.fromCharCode(chineseCharCode);
+      const stealthCharCode = config.baseCharCode + (charCode - 32);
+      result += String.fromCharCode(stealthCharCode);
     }
     
     return result;
   }
 
-  chineseToBase64(chineseText) {
-    // Convert Chinese characters back to base64 using simple, reversible mapping
-    let result = '';
-    const baseCharCode = 0x4E00;
+  async stealthTextToBase64(stealthText) {
+    // Try to detect the encoding type
+    const cleanText = stealthText.replace(/\s+/g, '');
     
-    for (let i = 0; i < chineseText.length; i++) {
-      const chineseCharCode = chineseText.charCodeAt(i);
+    // Check special encodings
+    const specialEncodings = ['morse', 'braille', 'binary', 'invisible'];
+    for (const encoding of specialEncodings) {
+      const config = this.getSpecialEncodingConfig(encoding);
+      if (config && config.detector(stealthText)) {
+        return config.decoder(stealthText);
+      }
+    }
+    
+    // Try regular unicode languages
+    const languages = ['chinese', 'arabic', 'japanese', 'korean', 'russian', 'thai', 'hindi', 'greek', 'georgian', 'armenian', 'amharic'];
+    
+    for (const language of languages) {
+      const config = this.getLanguageConfig(language);
+      let matches = 0;
       
-             // Check if it's in our expected range
-       if (chineseCharCode < baseCharCode || chineseCharCode > baseCharCode + 94) {
-         // console.warn('🔐 [DECODE] Character out of expected range:', chineseCharCode, 'at position', i);
-         // Try to handle gracefully
-         result += '?';
-         continue;
-       }
-       
-       // Simple reverse mapping
-       const originalCharCode = (chineseCharCode - baseCharCode) + 32;
-       
-       // Validate the result is in printable ASCII range
-       if (originalCharCode < 32 || originalCharCode > 126) {
-         // console.warn('🔐 [DECODE] Invalid ASCII char code:', originalCharCode);
-         result += '?';
-         continue;
-       }
+      for (let i = 0; i < Math.min(cleanText.length, 20); i++) {
+        const charCode = cleanText.charCodeAt(i);
+        if (config.detector(charCode)) {
+          matches++;
+        }
+      }
+      
+      if (matches / Math.min(cleanText.length, 20) > 0.7) {
+        // This looks like this language, decode it
+        return this.decodeUnicodeLanguage(cleanText, config);
+      }
+    }
+    
+    // Fallback to Chinese if nothing matches
+    return this.decodeUnicodeLanguage(cleanText, this.getLanguageConfig('chinese'));
+  }
+
+  decodeUnicodeLanguage(text, config) {
+    let result = '';
+    
+    for (let i = 0; i < text.length; i++) {
+      const stealthCharCode = text.charCodeAt(i);
+      
+      if (stealthCharCode < config.baseCharCode || stealthCharCode > config.baseCharCode + config.range) {
+        result += '?';
+        continue;
+      }
+      
+      const originalCharCode = (stealthCharCode - config.baseCharCode) + 32;
+      
+      if (originalCharCode < 32 || originalCharCode > 126) {
+        result += '?';
+        continue;
+      }
       
       result += String.fromCharCode(originalCharCode);
     }
@@ -3389,36 +3608,233 @@ class DiscordCryptochat {
     return result;
   }
 
-  isAlreadyEncrypted(text) {
-    // Check if text looks like our encoded Chinese characters
-    if (!text || text.length === 0) return false;
+  // MORSE CODE ENCODING
+  encodeToMorse(base64) {
+    const morseTable = {
+      'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+      'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+      'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+      'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+      'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---',
+      '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+      '8': '---..', '9': '----.', '+': '.-.-.', '/': '-..-.', '=': '-...-'
+    };
     
-    // Remove spaces to count only Chinese characters
-    const textWithoutSpaces = text.replace(/\s+/g, '');
-    if (textWithoutSpaces.length < 10) return false;
-    
-    // Check if most non-space characters are in the CJK range we use
-    let chineseCount = 0;
-    for (let i = 0; i < textWithoutSpaces.length; i++) {
-      const charCode = textWithoutSpaces.charCodeAt(i);
-      if (charCode >= 0x4E00 && charCode <= 0x7000) {
-        chineseCount++;
+    let result = '';
+    for (let i = 0; i < base64.length; i++) {
+      const char = base64[i].toUpperCase();
+      if (morseTable[char]) {
+        result += morseTable[char] + ' ';
+      } else {
+        // For unknown chars, use a pattern based on char code
+        const code = base64.charCodeAt(i);
+        result += '.'.repeat(code % 4 + 1) + '-'.repeat(code % 3 + 1) + ' ';
       }
     }
     
-    // If more than 70% are in our Chinese range, consider it encrypted
-    const ratio = chineseCount / textWithoutSpaces.length;
-    const isEncrypted = ratio > 0.7;
+    return result.trim();
+  }
+
+  decodeFromMorse(morse) {
+    const morseToChar = {
+      '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E', '..-.': 'F',
+      '--.': 'G', '....': 'H', '..': 'I', '.---': 'J', '-.-': 'K', '.-..': 'L',
+      '--': 'M', '-.': 'N', '---': 'O', '.--.': 'P', '--.-': 'Q', '.-.': 'R',
+      '...': 'S', '-': 'T', '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X',
+      '-.--': 'Y', '--..': 'Z', '-----': '0', '.----': '1', '..---': '2',
+      '...--': '3', '....-': '4', '.....': '5', '-....': '6', '--...': '7',
+      '---..': '8', '----.': '9', '.-.-.': '+', '-..-.': '/', '-...-': '='
+    };
     
-    // console.log('🔐 [CRYPTO] 🔍 Checking if encrypted:', {
-    //   textLength: text.length,
-    //   cleanLength: textWithoutSpaces.length,
-    //   chineseCount: chineseCount,
-    //   ratio: ratio.toFixed(2),
-    //   isEncrypted: isEncrypted
-    // });
+    const codes = morse.trim().split(/\s+/);
+    let result = '';
     
-    return isEncrypted;
+    for (const code of codes) {
+      if (morseToChar[code]) {
+        result += morseToChar[code];
+      } else {
+        // Try to reverse engineer unknown patterns
+        const dotCount = (code.match(/\./g) || []).length;
+        const dashCount = (code.match(/-/g) || []).length;
+        const charCode = 32 + ((dotCount * 16 + dashCount * 8) % 95);
+        result += String.fromCharCode(charCode);
+      }
+    }
+    
+    return result;
+  }
+
+  // BRAILLE ENCODING
+  encodeToBraille(base64) {
+    // Braille patterns start at U+2800
+    let result = '';
+    
+    for (let i = 0; i < base64.length; i++) {
+      const charCode = base64.charCodeAt(i);
+      // Map ASCII to braille patterns
+      const brailleCode = 0x2800 + (charCode - 32);
+      result += String.fromCharCode(brailleCode);
+    }
+    
+    return result;
+  }
+
+  decodeFromBraille(braille) {
+    let result = '';
+    
+    for (let i = 0; i < braille.length; i++) {
+      const brailleCode = braille.charCodeAt(i);
+      
+      if (brailleCode >= 0x2800 && brailleCode <= 0x28FF) {
+        const originalCode = (brailleCode - 0x2800) + 32;
+        if (originalCode >= 32 && originalCode <= 126) {
+          result += String.fromCharCode(originalCode);
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  // BINARY ENCODING
+  encodeToBinary(base64) {
+    let result = '';
+    
+    for (let i = 0; i < base64.length; i++) {
+      const charCode = base64.charCodeAt(i);
+      const binary = charCode.toString(2).padStart(8, '0');
+      result += binary + ' ';
+    }
+    
+    return result.trim();
+  }
+
+  decodeFromBinary(binary) {
+    const binaryGroups = binary.trim().split(/\s+/);
+    let result = '';
+    
+    for (const group of binaryGroups) {
+      if (/^[01]+$/.test(group)) {
+        const charCode = parseInt(group, 2);
+        if (charCode >= 32 && charCode <= 126) {
+          result += String.fromCharCode(charCode);
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  // INVISIBLE ENCODING (Zero-width characters)
+  encodeToInvisible(base64) {
+    const invisibleChars = ['\u200B', '\u200C', '\u200D', '\u2060'];
+    let result = '';
+    
+    for (let i = 0; i < base64.length; i++) {
+      const charCode = base64.charCodeAt(i);
+      
+      // Convert to base-4 using invisible characters
+      let temp = charCode;
+      let encoded = '';
+      for (let j = 0; j < 4; j++) {
+        encoded = invisibleChars[temp % 4] + encoded;
+        temp = Math.floor(temp / 4);
+      }
+      result += encoded;
+    }
+    
+    return result;
+  }
+
+  decodeFromInvisible(invisible) {
+    const invisibleChars = ['\u200B', '\u200C', '\u200D', '\u2060'];
+    let result = '';
+    
+    // Process in groups of 4 invisible characters
+    for (let i = 0; i < invisible.length; i += 4) {
+      let charCode = 0;
+      
+      for (let j = 0; j < 4 && i + j < invisible.length; j++) {
+        const char = invisible[i + j];
+        const index = invisibleChars.indexOf(char);
+        if (index !== -1) {
+          charCode = charCode * 4 + index;
+        }
+      }
+      
+      if (charCode >= 32 && charCode <= 126) {
+        result += String.fromCharCode(charCode);
+      }
+    }
+    
+    return result;
+  }
+
+  // Legacy functions for compatibility
+  base64ToChinese(base64) {
+    return this.base64ToStealthText(base64);
+  }
+
+  chineseToBase64(chineseText) {
+    return this.stealthTextToBase64(chineseText);
+  }
+
+  isAlreadyEncrypted(text) {
+    // Check if text looks like our encoded content
+    if (!text || text.length === 0) return false;
+    
+    const textWithoutSpaces = text.replace(/\s+/g, '');
+    if (textWithoutSpaces.length < 5) return false;
+    
+    // Check for special encodings first
+    if (/^[.\-\s]+$/.test(text.trim()) && text.length > 10) {
+      return true; // Morse code
+    }
+    
+    if (/^[⠀-⣿\s]+$/.test(text.trim()) && text.length > 5) {
+      return true; // Braille
+    }
+    
+    if (/^[01\s]+$/.test(text.trim()) && text.length > 20) {
+      return true; // Binary
+    }
+    
+    if (/^[\u200B\u200C\u200D\u2060\uFEFF\s]+$/.test(text)) {
+      return true; // Invisible characters
+    }
+    
+    // Check for various unicode language ranges
+    const languageRanges = [
+      { min: 0x4E00, max: 0x7000 }, // Chinese
+      { min: 0x0600, max: 0x06FF }, // Arabic
+      { min: 0x3040, max: 0x309F }, // Japanese Hiragana
+      { min: 0xAC00, max: 0xD7AF }, // Korean
+      { min: 0x0400, max: 0x04FF }, // Russian/Cyrillic
+      { min: 0x0E00, max: 0x0E7F }, // Thai
+      { min: 0x0900, max: 0x097F }, // Hindi/Devanagari
+      { min: 0x0370, max: 0x03FF }, // Greek
+      { min: 0x10A0, max: 0x10FF }, // Georgian
+      { min: 0x0530, max: 0x058F }, // Armenian
+      { min: 0x1200, max: 0x137F }, // Amharic/Ethiopic
+      { min: 0x2800, max: 0x28FF }  // Braille patterns
+    ];
+    
+    for (const range of languageRanges) {
+      let count = 0;
+      for (let i = 0; i < textWithoutSpaces.length; i++) {
+        const charCode = textWithoutSpaces.charCodeAt(i);
+        if (charCode >= range.min && charCode <= range.max) {
+          count++;
+        }
+      }
+      
+      const ratio = count / textWithoutSpaces.length;
+      if (ratio > 0.7) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   // ========== NEW HANDLER METHODS FOR OPTIONS PAGE ==========
@@ -3545,7 +3961,7 @@ class DiscordCryptochat {
       if (!result.success && this.encryptionKey) {
         try {
           const encryptedMessage = await discordCrypto.encrypt(message, this.encryptionKey);
-          const finalMessage = this.encodeStealthMessage(encryptedMessage);
+          const finalMessage = await this.encodeStealthMessage(encryptedMessage);
           
           result = {
             success: true,
@@ -3592,7 +4008,7 @@ class DiscordCryptochat {
       // Fallback to symmetric decryption
       if (!result.success && this.encryptionKey) {
         try {
-          const encryptedPayload = this.decodeStealthMessage(encryptedText);
+          const encryptedPayload = await this.decodeStealthMessage(encryptedText);
           const decryptedMessage = await discordCrypto.decrypt(encryptedPayload, this.encryptionKey);
           
           result = {
@@ -3665,6 +4081,84 @@ class DiscordCryptochat {
     } catch (error) {
       // //console.log('🔐 [CONTENT] 🔑 ❌ Failed to rotate EC keys:', error);
       sendResponse({ success: false, error: error.message, source: source });
+    }
+  }
+
+  detectDiscordUserFromDOM() {
+    try {
+      // Look for the user area section - the structure you provided
+      const userSection = document.querySelector('section[aria-label="User area"]');
+      if (!userSection) {
+        throw new Error('User area section not found');
+      }
+
+      // Extract user ID from avatar src
+      const avatarImg = userSection.querySelector('img.avatar__44b0c');
+      let userId = null;
+      let username = 'Unknown';
+
+      if (avatarImg && avatarImg.src) {
+        // Extract user ID from Discord avatar URL
+        // Format: https://cdn.discordapp.com/avatars/USER_ID/HASH.webp?size=48
+        const match = avatarImg.src.match(/\/avatars\/(\d+)\//);
+        if (match) {
+          userId = match[1];
+        }
+      }
+
+      // Extract username from the title section
+      const titleElement = userSection.querySelector('.title_b6c092, .panelTitleContainer__37e49 .title_b6c092');
+      if (titleElement) {
+        username = titleElement.textContent.trim();
+      }
+
+      // Fallback: look for display name in the hovered section
+      if (username === 'Unknown') {
+        const hoveredElement = userSection.querySelector('.hovered__0263c');
+        if (hoveredElement) {
+          const displayName = hoveredElement.textContent.trim();
+          if (displayName && displayName !== 'Idle' && displayName !== 'Online' && displayName !== 'Do Not Disturb' && displayName !== 'Invisible') {
+            username = displayName;
+          }
+        }
+      }
+
+      // Alternative method: look for user info in different selectors
+      if (!userId) {
+        // Try alternative avatar selectors
+        const altAvatar = document.querySelector('[role="img"][aria-label*=","] img[src*="/avatars/"]');
+        if (altAvatar && altAvatar.src) {
+          const match = altAvatar.src.match(/\/avatars\/(\d+)\//);
+          if (match) {
+            userId = match[1];
+          }
+        }
+      }
+
+      // Try another approach for username if still unknown
+      if (username === 'Unknown') {
+        const nameTag = userSection.querySelector('.nameTag__37e49, [class*="nameTag"]');
+        if (nameTag) {
+          const textContent = nameTag.textContent.trim();
+          const lines = textContent.split('\n').filter(line => line.trim());
+          if (lines.length > 0) {
+            username = lines[0].trim();
+          }
+        }
+      }
+
+      if (!userId) {
+        throw new Error('Could not find user ID in Discord DOM. Make sure you are logged in to Discord.');
+      }
+
+      return {
+        userId: userId,
+        username: username,
+        success: true
+      };
+
+    } catch (error) {
+      throw new Error(`Auto-detection failed: ${error.message}. Please ensure Discord is fully loaded and you are logged in.`);
     }
   }
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Cryptochat Settings</title>
+    <title>Lemonade Settings - Discord Encryption</title>
     <style>
         * {
             margin: 0;
@@ -12,70 +12,157 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 25%, #e17055 50%, #fd79a8 75%, #6c5ce7 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
+            padding: 20px;
+            color: #2d3436;
+            overflow-x: hidden;
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
             padding: 40px;
-            max-width: 500px;
-            width: 90%;
-            animation: slideUp 0.5s ease-out;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            backdrop-filter: blur(20px);
+            animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(30px);
+                transform: translateY(40px) scale(0.95);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            padding: 30px;
+            border-radius: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
         }
 
         .logo {
-            font-size: 48px;
-            margin-bottom: 10px;
+            font-size: 64px;
+            margin-bottom: 16px;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 1;
         }
 
         .title {
-            font-size: 28px;
-            font-weight: 600;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 5px;
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 1;
         }
 
         .subtitle {
-            color: #666;
-            font-size: 16px;
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            padding: 24px;
+            border-radius: 16px;
+            color: white;
+            box-shadow: 0 8px 32px rgba(116, 185, 255, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(116, 185, 255, 0.4);
+        }
+
+        .feature-card h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-card p {
+            font-size: 14px;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(116, 185, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .label {
             display: block;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 8px;
-            color: #333;
+            color: #2d3436;
+            font-size: 14px;
         }
 
         .input-container {
@@ -84,19 +171,20 @@
 
         .input {
             width: 100%;
-            padding: 16px 50px 16px 16px;
+            padding: 16px 20px;
             border: 2px solid #e1e5e9;
             border-radius: 12px;
             font-size: 16px;
             transition: all 0.3s ease;
-            background: #f8f9fa;
+            background: rgba(255, 255, 255, 0.9);
+            font-family: inherit;
         }
 
         .input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #fdcb6e;
             background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px rgba(253, 203, 110, 0.15);
         }
 
         .toggle-password {
@@ -117,22 +205,26 @@
         }
 
         .button {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 16px 24px;
+            background: linear-gradient(45deg, #fdcb6e, #e17055);
             color: white;
             border: none;
             border-radius: 12px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-right: 12px;
             margin-bottom: 12px;
+            box-shadow: 0 4px 16px rgba(253, 203, 110, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 24px rgba(253, 203, 110, 0.4);
         }
 
         .button:active {
@@ -140,110 +232,279 @@
         }
 
         .button.secondary {
-            background: #f8f9fa;
-            color: #667eea;
-            border: 2px solid #667eea;
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            box-shadow: 0 4px 16px rgba(116, 185, 255, 0.3);
         }
 
         .button.secondary:hover {
-            background: #667eea;
-            color: white;
+            box-shadow: 0 8px 24px rgba(116, 185, 255, 0.4);
+        }
+
+        .button.danger {
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            box-shadow: 0 4px 16px rgba(253, 121, 168, 0.3);
+        }
+
+        .button.danger:hover {
+            box-shadow: 0 8px 24px rgba(253, 121, 168, 0.4);
+        }
+
+        .button.success {
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            box-shadow: 0 4px 16px rgba(0, 184, 148, 0.3);
+        }
+
+        .button.success:hover {
+            box-shadow: 0 8px 24px rgba(0, 184, 148, 0.4);
         }
 
         .status {
-            padding: 12px 16px;
-            border-radius: 8px;
+            padding: 16px 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
             font-weight: 500;
             text-align: center;
             transition: all 0.3s ease;
+            border: 2px solid transparent;
         }
 
         .status.success {
-            background: #d4edda;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border-color: #00b894;
         }
 
         .status.error {
-            background: #f8d7da;
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border-color: #e84393;
         }
 
         .status.info {
-            background: #cce7ff;
+            background: linear-gradient(135deg, #cce7ff, #b3d7ff);
             color: #004085;
-            border: 1px solid #b3d7ff;
+            border-color: #74b9ff;
         }
 
         .help-text {
-            font-size: 14px;
-            color: #666;
+            font-size: 13px;
+            color: #636e72;
             margin-top: 8px;
-            line-height: 1.4;
+            line-height: 1.5;
         }
 
-        .key-info {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 20px;
+        .warning {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 2px solid #fdcb6e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
         }
 
-        .key-info-title {
-            font-weight: 600;
+        .warning-title {
+            font-weight: 700;
             margin-bottom: 8px;
-            color: #333;
+            font-size: 16px;
         }
 
-        .key-fingerprint {
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 12px 16px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #2d3436;
+        }
+
+        .info-value {
             font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 12px;
             background: white;
-            padding: 8px;
+            padding: 4px 8px;
             border-radius: 4px;
             border: 1px solid #e1e5e9;
             word-break: break-all;
         }
 
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             padding: 16px;
-            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            margin: 12px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .warning-title {
-            font-weight: 600;
+        .checkbox-group:hover {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #fdcb6e;
+            cursor: pointer;
+        }
+
+        .contact-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .contact-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
             margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .contact-name {
+            font-weight: 600;
+            color: #2d3436;
+        }
+
+        .contact-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+            color: #636e72;
+            font-size: 11px;
         }
 
         .footer {
             text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e1e5e9;
-            color: #666;
+            margin-top: 40px;
+            padding-top: 24px;
+            border-top: 2px solid rgba(253, 203, 110, 0.2);
+            color: #636e72;
+        }
+
+        .footer h3 {
+            color: #2d3436;
+            margin-bottom: 16px;
+            font-size: 24px;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid #fdcb6e;
+            font-size: 13px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
             font-size: 14px;
+            font-weight: 700;
+            margin-left: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .logo {
+                font-size: 48px;
+            }
+            
+            .title {
+                font-size: 28px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">🔐</div>
-            <h1 class="title">Discord Cryptochat</h1>
-            <p class="subtitle">End-to-end encryption for Discord messages</p>
+            <div class="logo">🍋</div>
+            <h1 class="title">Lemonade Settings</h1>
+            <p class="subtitle">Sweet & Secure Discord Encryption <span class="version-badge">v1.0.0</span></p>
         </div>
 
         <div id="status-message" class="status" style="display: none;"></div>
 
+        <!-- Comprehensive Features Overview -->
+        <div class="section">
+            <h2 class="section-title">🌟 Lemonade Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>🔐 End-to-End Encryption</h3>
+                    <p>Military-grade AES-GCM and ECDH P-256 encryption ensures your messages stay private between trusted contacts.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎬 GIF & Media Encryption</h3>
+                    <p>Encrypt GIFs, images, and media directly from Discord's picker with interactive modal viewing.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>👥 Auto Contact Discovery</h3>
+                    <p>Automatically discover and store encryption keys from trusted contacts without manual setup.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔄 Perfect Forward Secrecy</h3>
+                    <p>Automatic key rotation ensures past messages remain secure even if current keys are compromised.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎭 Stealth Mode</h3>
+                    <p>Messages are encoded as Chinese characters, making them invisible to casual observers.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚡ Real-time Performance</h3>
+                    <p>Optimized scanning and decryption with configurable performance settings for any device.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Basic Settings -->
+        <div class="section">
+            <h2 class="section-title">🔑 Basic Encryption Settings</h2>
+
         <div class="warning">
-            <div class="warning-title">⚠️ Important Security Notice</div>
-            <p>Share this encryption key only with trusted contacts. Anyone with this key can decrypt your messages. Store it securely!</p>
+                <div class="warning-title">🍋 Security Notice</div>
+                <p>Share your encryption key only with trusted contacts. Anyone with this key can decrypt your messages. Store it securely!</p>
         </div>
 
         <form id="key-form">
@@ -264,141 +525,35 @@
                 </div>
             </div>
 
-            <button type="submit" class="button" id="save-button">
-                Save Encryption Key
+                <button type="submit" class="button success" id="save-button">
+                    💾 Save Encryption Key
             </button>
 
             <button type="button" class="button secondary" id="test-button">
-                Test Encryption
-            </button>
-        </form>
-
-        <!-- Key Rotation Section -->
-        <div class="key-info">
-            <div class="key-info-title">🔄 Key Rotation & Perfect Forward Secrecy</div>
-            <div class="help-text" style="margin-bottom: 16px;">
-                Automatically rotate your encryption key based on time intervals. Each rotation uses a one-way hash, 
-                ensuring old keys cannot be recovered even if your current key is compromised.
-            </div>
-            
-            <div style="margin-bottom: 12px;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" id="enable-rotation" style="margin-right: 8px;">
-                    <span>Enable automatic key rotation</span>
-                </label>
-            </div>
-
-            <div id="rotation-settings" style="display: none;">
-                <div style="margin-bottom: 12px;">
-                    <label class="label" style="font-size: 14px;">Base Key (Starting Point)</label>
-                    <input type="password" id="base-key" class="input" placeholder="Enter your master key (16-256 chars)..." style="font-size: 14px; padding: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                        ⚠️ Minimum 16 characters. Will be cleared after setup for security.
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 12px;">
-                    <label class="label" style="font-size: 14px;">Rotation Interval</label>
-                    <select id="rotation-interval" class="input" style="font-size: 14px; padding: 10px;">
-                        <option value="10000">10 Seconds (Testing)</option>
-                        <option value="60000">1 Minute</option>
-                        <option value="3600000">1 Hour</option>
-                        <option value="86400000">1 Day</option>
-                        <option value="604800000" selected>1 Week</option>
-                        <option value="2629746000">1 Month</option>
-                        <option value="custom">Custom...</option>
-                    </select>
-                </div>
-
-                                    <div id="custom-interval" style="display: none; margin-bottom: 12px;">
-                        <label class="label" style="font-size: 14px;">Custom Interval (seconds)</label>
-                        <input type="number" id="custom-seconds" class="input" min="10" placeholder="3600" style="font-size: 14px; padding: 10px;">
-                        <div style="font-size: 12px; color: #666; margin-top: 4px;">Minimum: 10 seconds</div>
-                    </div>
-
-                <button id="setup-rotation" class="button" style="margin-bottom: 8px;">
-                    🔄 Setup Key Rotation
+                    🧪 Test Encryption
                 </button>
-
-                <div id="rotation-status" style="font-size: 12px; color: #666;"></div>
-            </div>
+            </form>
         </div>
 
-        <!-- Sync Section -->
-        <!-- <div class="key-info">
-            <div class="key-info-title">🔄 Sync with Friend</div>
-            <div class="help-text" style="margin-bottom: 16px;">
-                Generate an encrypted sync code to perfectly synchronize key rotation timing with your friend.
-                Both users will have identical key rotation schedules after syncing.
-            </div>
-            
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">📡 How to Sync</div>
-                <div style="font-size: 13px; color: #856404; line-height: 1.4;">
-                    1. Click "Generate Sync Code" below<br>
-                    2. Copy and share the code with your friend<br>
-                    3. Your friend pastes it and clicks "Apply Sync"<br>
-                    4. Both will have perfectly synchronized rotations
-                </div>
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <button id="generate-sync" class="button secondary" style="font-size: 14px; padding: 12px;">
-                    📡 Generate Sync Code
-                </button>
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <label class="label" style="font-size: 14px; margin-bottom: 8px; display: block;">Your Sync Code (Share This)</label>
-                <div style="display: flex; gap: 10px; align-items: flex-start;">
-                    <textarea id="sync-code-output" readonly class="input" style="flex: 1; resize: vertical; min-height: 80px; max-height: 120px; font-family: 'Courier New', monospace; font-size: 10px; background: #f8f9fa; line-height: 1.2; word-break: break-all;" placeholder="Click 'Generate Sync Code' above"></textarea>
-                    <button id="copy-sync-code" class="button" style="width: 80px; height: 40px; font-size: 11px; padding: 8px; background: #6c757d; margin-top: 0;" disabled>
-                        📋<br>Copy
-                    </button>
-                </div>
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <label class="label" style="font-size: 14px; margin-bottom: 8px; display: block;">Apply Friend's Sync Code</label>
-                <div style="display: flex; gap: 10px; align-items: flex-start;">
-                    <textarea id="sync-code-input" class="input" style="flex: 1; resize: vertical; min-height: 80px; max-height: 120px; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.2; word-break: break-all;" placeholder="Paste your friend's sync code here"></textarea>
-                    <button id="apply-sync-code" class="button" style="width: 80px; height: 40px; font-size: 11px; padding: 8px; background: #17a2b8; margin-top: 0;">
-                        🔄<br>Apply
-                    </button>
-                </div>
-            </div>
-
-            <div id="sync-status" style="font-size: 12px; color: #666; display: none;"></div>
-            
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
-                <button id="debug-sync" class="button secondary" style="font-size: 12px; padding: 8px; background: #6c757d;">
-                    🔍 Debug Sync Keys
-                </button>
-                <div id="debug-output" style="font-size: 10px; color: #666; margin-top: 8px; font-family: monospace; max-height: 100px; overflow-y: auto; display: none;"></div>
-            </div>
-        </div> -->
-
-        <!-- Asymmetric Encryption Section -->
-        <div class="key-info">
-            <div class="key-info-title">🔐 Asymmetric Encryption (EC P-256)</div>
+        <!-- Asymmetric Encryption -->
+        <div class="section">
+            <h2 class="section-title">🔐 Advanced Asymmetric Encryption</h2>
             <div class="help-text" style="margin-bottom: 16px;">
                 Advanced elliptic curve encryption with automatic key exchange. No pre-shared keys needed - each user generates their own keypair and public keys are embedded in messages.
             </div>
             
-            <div style="margin-bottom: 12px;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" id="enable-asymmetric" style="margin-right: 8px;">
-                    <span>Enable asymmetric encryption (EC P-256)</span>
+            <div class="checkbox-group">
+                <input type="checkbox" id="enable-asymmetric">
+                <label for="enable-asymmetric" style="cursor: pointer;">
+                    <strong>Enable asymmetric encryption (EC P-256)</strong><br>
+                    <small style="color: #636e72;">Uses elliptic curve cryptography with automatic key rotation and contact discovery</small>
                 </label>
-                <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                    Uses elliptic curve cryptography with automatic key rotation and contact discovery
-                </div>
             </div>
 
             <div id="asymmetric-settings" style="display: none;">
-                <div style="margin-bottom: 12px;">
-                    <label class="label" style="font-size: 14px;">Key Rotation Interval</label>
-                    <select id="ec-rotation-interval" class="input" style="font-size: 14px; padding: 10px;">
+                <div class="form-group">
+                    <label class="label">Key Rotation Interval</label>
+                    <select id="ec-rotation-interval" class="input">
                         <option value="3600000" selected>1 Hour (Recommended)</option>
                         <option value="1800000">30 Minutes</option>
                         <option value="900000">15 Minutes</option>
@@ -408,216 +563,264 @@
                         <option value="10000">10 Seconds (Demo)</option>
                         <option value="manual">Manual Only</option>
                     </select>
-                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    <div class="help-text">
                         How often to rotate your private key for forward secrecy
                     </div>
                 </div>
 
-                <!-- User ID Setting Section -->
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                    <div style="font-weight: 600; margin-bottom: 12px; color: #856404;">👤 Discord User ID Setting</div>
-                    <div style="font-size: 12px; line-height: 1.4; color: #856404; margin-bottom: 12px;">
-                        <strong>Fix message decryption issues:</strong> Sometimes the system gets confused about your Discord user ID, causing encryption failures. Set your ID manually to prevent this.
-                    </div>
+                <!-- User ID Setting -->
+                <div class="warning">
+                    <div class="warning-title">👤 Discord User ID Setting</div>
+                    <p style="margin-bottom: 16px;"><strong>Fix message decryption issues:</strong> Sometimes the system gets confused about your Discord user ID, causing encryption failures. Set your ID manually to prevent this.</p>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 12px; margin-bottom: 12px; align-items: center;">
-                        <div style="font-weight: 500; color: #856404;">Current User ID:</div>
-                        <div id="current-user-id" style="font-family: monospace; background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">Not set</div>
+                    <div class="info-grid">
+                        <span class="info-label">Current User ID:</span>
+                        <span id="current-user-id" class="info-value">Not set</span>
                         
-                        <div style="font-weight: 500; color: #856404;">Username:</div>
-                        <div id="current-username" style="background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">Not set</div>
+                        <span class="info-label">Username:</span>
+                        <span id="current-username" class="info-value">Not set</span>
                     </div>
                     
-                    <div style="margin-bottom: 12px;">
-                        <label class="label" style="font-size: 14px; margin-bottom: 8px; color: #856404;">Set Your Discord User ID</label>
-                        <input type="text" id="manual-user-id" class="input" placeholder="e.g. 1127964562625417346" style="font-size: 14px; padding: 10px; font-family: monospace;">
-                        <div style="font-size: 11px; color: #856404; margin-top: 4px;">
+                    <div class="form-group">
+                        <label class="label">Set Your Discord User ID</label>
+                        <input type="text" id="manual-user-id" class="input" placeholder="e.g. 1127964562625417346" style="font-family: monospace;">
+                        <div class="help-text">
                             📋 <strong>How to find your ID:</strong> Go to Discord Settings → Advanced → Enable "Developer Mode" → Right-click your profile → "Copy User ID"
                         </div>
                     </div>
                     
-                    <div style="margin-bottom: 12px;">
-                        <label class="label" style="font-size: 14px; margin-bottom: 8px; color: #856404;">Set Your Username (Optional)</label>
-                        <input type="text" id="manual-username" class="input" placeholder="e.g. YourDiscordName" style="font-size: 14px; padding: 10px;">
-                        <div style="font-size: 11px; color: #856404; margin-top: 4px;">
+                    <div class="form-group">
+                        <label class="label">Set Your Username (Optional)</label>
+                        <input type="text" id="manual-username" class="input" placeholder="e.g. YourDiscordName">
+                        <div class="help-text">
                             This is just for display purposes in your contacts list
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 8px;">
-                        <button id="set-user-id" class="button" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #856404; color: white;">
+                    <button id="set-user-id" class="button success">
                             💾 Set User ID
                         </button>
-                        <button id="auto-detect-user-id" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #17a2b8; color: white;">
+                    <button id="auto-detect-user-id" class="button secondary">
                             🔍 Auto-Detect
                         </button>
-                    </div>
                 </div>
 
-                <!-- Key Management Section -->
-                <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                    <div style="font-weight: 600; margin-bottom: 12px; color: #333;">🔑 Current Key Information</div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 12px; margin-bottom: 12px;">
-                        <div style="font-weight: 500;">Key ID:</div>
-                        <div id="current-key-id" style="font-family: monospace; background: white; padding: 4px 8px; border-radius: 4px;">Loading...</div>
+                <!-- Key Management -->
+                <div class="info-grid">
+                    <span class="info-label">Key ID:</span>
+                    <span id="current-key-id" class="info-value">Loading...</span>
                         
-                        <div style="font-weight: 500;">Created:</div>
-                        <div id="key-created" style="background: white; padding: 4px 8px; border-radius: 4px;">Loading...</div>
+                    <span class="info-label">Created:</span>
+                    <span id="key-created" class="info-value">Loading...</span>
                         
-                        <div style="font-weight: 500;">Next Rotation:</div>
-                        <div id="next-rotation" style="background: white; padding: 4px 8px; border-radius: 4px;">N/A</div>
+                    <span class="info-label">Next Rotation:</span>
+                    <span id="next-rotation" class="info-value">N/A</span>
                         
-                        <div style="font-weight: 500;">Contacts:</div>
-                        <div id="contact-count" style="background: white; padding: 4px 8px; border-radius: 4px;">0</div>
+                    <span class="info-label">Contacts:</span>
+                    <span id="contact-count" class="info-value">0</span>
                     </div>
                     
-                    <div style="margin-bottom: 12px;">
-                        <div style="font-weight: 500; margin-bottom: 4px; font-size: 12px;">Public Key:</div>
-                        <textarea id="my-public-key" readonly style="width: 100%; height: 60px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white; resize: none;" placeholder="Loading..."></textarea>
+                <div class="form-group">
+                    <label class="label">Your Public Key</label>
+                    <textarea id="my-public-key" readonly class="input" style="height: 80px; font-family: monospace; font-size: 12px; resize: none;" placeholder="Loading..."></textarea>
                     </div>
                     
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button id="rotate-keys-now" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1;">
+                <button id="rotate-keys-now" class="button secondary">
                             🔄 Rotate Keys Now
                         </button>
-                        <button id="export-public-key" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1;">
+                <button id="export-public-key" class="button secondary">
                             📋 Copy Public Key
                         </button>
-                        <button id="clear-all-contacts" class="button secondary" style="font-size: 12px; padding: 8px 12px; flex: 1; background: #dc3545; color: white;">
+                <button id="clear-all-contacts" class="button danger">
                             🗑️ Clear Contacts
                         </button>
-                    </div>
-                </div>
 
                 <!-- Contacts Section -->
-                <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <div style="font-weight: 600; color: #333;">👥 Discovered Contacts</div>
-                        <button id="view-contacts" class="button secondary" style="font-size: 11px; padding: 6px 10px;">
-                            🔄 Refresh
-                        </button>
-                    </div>
-                    
-                    <div id="contact-list-content" style="font-size: 11px; max-height: 120px; overflow-y: auto;">
-                        <div style="color: #666; text-align: center; padding: 20px;">
+                <h3 style="margin: 24px 0 12px 0; color: #2d3436;">👥 Discovered Contacts</h3>
+                <div class="contact-list">
+                    <div id="contact-list-content" style="text-align: center; color: #636e72; padding: 20px;">
                             No contacts discovered yet. Send an encrypted message to discover contacts automatically.
-                        </div>
                     </div>
                 </div>
-
+                <button id="view-contacts" class="button secondary">
+                    🔄 Refresh Contacts
+                </button>
              
-
-                <div id="asymmetric-status" style="font-size: 12px; color: #666; background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 12px;">
-                    <div>Status: <span id="ec-status-text">Initializing...</span></div>
+                <div id="asymmetric-status" style="background: rgba(255, 255, 255, 0.7); padding: 16px; border-radius: 8px; margin-top: 16px; font-size: 14px;">
+                    Status: <span id="ec-status-text">Initializing...</span>
                 </div>
             </div>
         </div>
 
-  
+        <!-- Stealth Language Settings -->
+        <div class="section">
+            <h2 class="section-title">🎭 Stealth Language Settings</h2>
+            <div class="help-text" style="margin-bottom: 16px;">
+                Choose how your encrypted messages appear to others. The language is purely cosmetic - anyone with Lemonade can decrypt regardless of display language!
+            </div>
+            
+            <div class="form-group">
+                <label class="label">Stealth Display Language</label>
+                <select id="stealth-language" class="input">
+                    <optgroup label="🌏 Unicode Languages">
+                        <option value="chinese">🇨🇳 Chinese (Traditional)</option>
+                        <option value="arabic">🇸🇦 Arabic</option>
+                        <option value="japanese">🇯🇵 Japanese</option>
+                        <option value="korean">🇰🇷 Korean</option>
+                        <option value="russian">🇷🇺 Russian</option>
+                        <option value="thai">🇹🇭 Thai</option>
+                        <option value="hindi">🇮🇳 Hindi</option>
+                        <option value="greek">🇬🇷 Greek</option>
+                        <option value="georgian">🇬🇪 Georgian</option>
+                        <option value="armenian">🇦🇲 Armenian</option>
+                        <option value="amharic">🇪🇹 Amharic</option>
+                    </optgroup>
+                    <optgroup label="🔤 Special Encodings">
+                        <option value="morse">📡 Morse Code</option>
+                        <option value="braille">👆 Braille</option>
+                        <option value="binary">💻 Binary</option>
+                        <option value="invisible">👻 Invisible Characters</option>
+                    </optgroup>
+                </select>
+                <div class="help-text">
+                    <strong>Universal Compatibility:</strong> Your friends can use any language setting and still decrypt your messages perfectly!
+                </div>
+            </div>
 
-        <!-- Decryption Speed Section -->
-        <div class="key-info">
-            <div class="key-info-title">⚡ Decryption Speed Settings</div>
+            <div class="form-group">
+                <label class="label">Live Preview</label>
+                <div id="language-preview" style="background: rgba(255, 255, 255, 0.7); padding: 16px; border-radius: 8px; margin: 8px 0; font-family: monospace; min-height: 60px; display: flex; align-items: center; justify-content: center; color: #2d3436;">
+                    Select a language to see preview...
+                </div>
+                <div class="help-text">
+                    This is how "Hello World!" would appear to others in your selected language.
+                </div>
+            </div>
+
+            <button id="save-language-settings" class="button success">
+                🎭 Save Language Settings
+            </button>
+
+            <div id="language-status" style="margin-top: 12px; font-size: 14px; color: #636e72;"></div>
+        </div>
+
+        <!-- Performance Settings -->
+        <div class="section">
+            <h2 class="section-title">⚡ Performance Settings</h2>
             <div class="help-text" style="margin-bottom: 16px;">
                 Configure how fast the extension scans for encrypted messages. Faster scanning = quicker decryption but more CPU usage.
             </div>
             
-            <div style="margin-bottom: 12px;">
-                <label class="label" style="font-size: 14px;">Scan Frequency</label>
-                <select id="scan-frequency" class="input" style="font-size: 14px; padding: 10px;">
+            <div class="form-group">
+                <label class="label">Scan Frequency</label>
+                <select id="scan-frequency" class="input">
                     <option value="500">⚡ Ultra Fast (0.5s) - High CPU</option>
                     <option value="1000" selected>🚀 Fast (1s) - Recommended</option>
                     <option value="2000">⚖️ Balanced (2s) - Default</option>
                     <option value="3000">🐌 Slow (3s) - Low CPU</option>
                     <option value="5000">🦴 Very Slow (5s) - Minimal CPU</option>
                 </select>
-                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                <div class="help-text">
                     How often to scan Discord for encrypted messages. Lower = faster decryption.
                 </div>
             </div>
 
-            <div style="margin-bottom: 12px;">
-                <label class="label" style="font-size: 14px;">Initial Load Delay</label>
-                <select id="initial-delay" class="input" style="font-size: 14px; padding: 10px;">
+            <div class="form-group">
+                <label class="label">Initial Load Delay</label>
+                <select id="initial-delay" class="input">
                     <option value="100">⚡ Instant (0.1s)</option>
                     <option value="500" selected>🚀 Fast (0.5s)</option>
                     <option value="1000">⚖️ Normal (1s)</option>
                     <option value="2000">🐌 Slow (2s)</option>
                 </select>
-                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                <div class="help-text">
                     How long to wait before starting decryption after loading a chat.
                 </div>
             </div>
 
-            <button id="save-speed-settings" class="button secondary" style="font-size: 14px; padding: 12px;">
+            <button id="save-speed-settings" class="button success">
                 ⚡ Save Speed Settings
             </button>
 
-            <div id="speed-status" style="font-size: 12px; color: #666; margin-top: 8px;"></div>
+            <div id="speed-status" style="margin-top: 12px; font-size: 14px; color: #636e72;"></div>
         </div>
 
-        <div id="key-info" class="key-info" style="display: none;">
-            <div class="key-info-title">🔑 Key Information</div>
+        <div id="key-info" class="section" style="display: none;">
+            <h2 class="section-title">🔑 Key Information</h2>
             <div class="help-text">Key Fingerprint (SHA-256):</div>
-            <div id="key-fingerprint" class="key-fingerprint"></div>
+            <div id="key-fingerprint" style="font-family: monospace; background: rgba(255, 255, 255, 0.7); padding: 12px; border-radius: 8px; word-break: break-all; margin-top: 8px;"></div>
         </div>
 
-        <!-- Changelog Section -->
-        <div class="key-info">
-            <div class="key-info-title">🎉 Version 2.1.0 - GIF Encryption & UI Enhancement Release</div>
-            <div style="font-size: 13px; line-height: 1.5; color: #666;">
-                <div style="margin-bottom: 12px; padding: 12px; background: #e8f5e8; border-radius: 6px; border-left: 4px solid #28a745;">
-                    <div style="font-weight: 600; color: #155724; margin-bottom: 6px;">🎬 Revolutionary GIF Encryption</div>
-                    <div>• <strong>Full GIF Picker Integration</strong> - Encrypt GIFs directly from Discord's picker!</div>
-                    <div>• <strong>Smart Category Detection</strong> - Auto-skips category selections, only encrypts actual GIFs</div>
-                    <div>• <strong>Network URL Mapping</strong> - Intercepts Discord's API calls for perfect URL extraction</div>
-                    <div>• <strong>Video-to-GIF Rendering</strong> - Handles media.tenor.com MP4s as animated videos</div>
-                    <div>• <strong>Auto-Encrypt Respect</strong> - GIF encryption follows your auto-encrypt toggle setting</div>
+        <!-- Comprehensive Features List -->
+        <div class="footer">
+            <h3>🍋 Complete Lemonade Feature List</h3>
+            
+            <div class="feature-list">
+                <div class="feature-item">
+                    <strong>🔐 Encryption Methods</strong><br>
+                    AES-GCM, ECDH P-256, Perfect Forward Secrecy
                 </div>
-                
-                <div style="margin-bottom: 12px; padding: 12px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
-                    <div style="font-weight: 600; color: #856404; margin-bottom: 6px;">🎨 Enhanced Media Experience</div>
-                    <div>• <strong>Interactive GIF Modals</strong> - Click any GIF to view in beautiful popup (like Discord!)</div>
-                    <div>• <strong>Responsive GIF Sizing</strong> - GIFs now fit their actual dimensions perfectly</div>
-                    <div>• <strong>Large Emoji Support</strong> - Single emojis (1-3) render extra large automatically</div>
-                    <div>• <strong>Smooth Animations</strong> - Fade-in effects and zoom animations for media</div>
-                    <div>• <strong>Keyboard Controls</strong> - Press ESC or click backdrop to close GIF modals</div>
+                <div class="feature-item">
+                    <strong>🎬 Media Support</strong><br>
+                    GIF encryption, Image encryption, Interactive modals
                 </div>
-
-                <div style="margin-bottom: 12px; padding: 12px; background: #d1ecf1; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                    <div style="font-weight: 600; color: #0c5460; margin-bottom: 6px;">⚡ Performance & Stability</div>
-                    <div>• <strong>Massive Console Cleanup</strong> - Commented out 200+ debug logs for better performance</div>
-                    <div>• <strong>Memory Optimization</strong> - Reduced CPU usage and improved browser responsiveness</div>
-                    <div>• <strong>Better Error Handling</strong> - Graceful fallbacks when GIF URLs can't be extracted</div>
-                    <div>• <strong>Improved User ID Detection</strong> - Enhanced auto-detection and manual setting options</div>
+                <div class="feature-item">
+                    <strong>👥 Contact Management</strong><br>
+                    Auto-discovery, Key storage, Username tracking
                 </div>
-
-                <div style="margin-bottom: 12px; padding: 12px; background: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">
-                    <div style="font-weight: 600; color: #721c24; margin-bottom: 6px;">🛠️ Technical Improvements</div>
-                    <div>• Network request interception for Discord's GIF search API</div>
-                    <div>• Clipboard-based message insertion (same method for text & GIFs)</div>
-                    <div>• Enhanced asymmetric encryption with contact auto-discovery</div>
-                    <div>• Real-time key rotation status with countdown timers</div>
-                    <div>• Comprehensive contact management with username tracking</div>
+                <div class="feature-item">
+                    <strong>🔄 Key Rotation</strong><br>
+                    Automatic rotation, Manual control, Time-based intervals
                 </div>
-
-                <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
-                    <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">🎯 How to Use GIF Encryption:</div>
-                    <div style="font-size: 12px; line-height: 1.4;">
-                        1. <strong>Enable auto-encrypt</strong> or keep it off for manual control<br/>
-                        2. <strong>Open Discord's GIF picker</strong> and search for any GIF<br/>
-                        3. <strong>Click on a GIF</strong> - it gets encrypted and sent automatically!<br/>
-                        4. <strong>Decrypted GIFs</strong> show as videos with popup modal support<br/>
-                        5. <strong>Categories are ignored</strong> - only actual GIF selections get encrypted
+                <div class="feature-item">
+                    <strong>🎭 Stealth Features</strong><br>
+                    Chinese character encoding, Invisible to observers
+                </div>
+                <div class="feature-item">
+                    <strong>⚡ Performance</strong><br>
+                    Configurable scan rates, Memory optimization
+                </div>
+                <div class="feature-item">
+                    <strong>🎯 User Experience</strong><br>
+                    Auto-encrypt toggle, Hotkey support, Visual indicators
+                </div>
+                <div class="feature-item">
+                    <strong>🛡️ Security</strong><br>
+                    Local storage only, No cloud/server, Audit trails
+                </div>
+                <div class="feature-item">
+                    <strong>🎨 Interface</strong><br>
+                    Modern design, Responsive layout, Beautiful animations
+                </div>
+                <div class="feature-item">
+                    <strong>⌨️ Shortcuts</strong><br>
+                    Ctrl+Shift+E (toggle), Ctrl+Shift+D (on/off)
+                </div>
+                <div class="feature-item">
+                    <strong>📱 Compatibility</strong><br>
+                    All Discord variants, Cross-browser support
                     </div>
+                <div class="feature-item">
+                    <strong>🔧 Advanced</strong><br>
+                    Debug tools, Export/import, Custom settings
                 </div>
+            </div>
+
+            <div style="margin-top: 32px; padding: 24px; background: linear-gradient(135deg, #fdcb6e, #e17055); border-radius: 16px; color: white;">
+                <h4 style="margin-bottom: 12px; font-size: 18px;">🍋 Quick Start Guide</h4>
+                <div style="text-align: left; font-size: 14px; line-height: 1.6;">
+                    <strong>1.</strong> Set your encryption key above<br>
+                    <strong>2.</strong> Enable asymmetric encryption for advanced features<br>
+                    <strong>3.</strong> Type <code style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">!priv</code> before messages to encrypt<br>
+                    <strong>4.</strong> Or toggle auto-encrypt in the popup (🍋 icon)<br>
+                    <strong>5.</strong> Share your public key with trusted contacts<br>
+                    <strong>6.</strong> Enjoy sweet & secure conversations! 🍋
             </div>
         </div>
 
-        <div class="footer">
-            <p>💡 Type <code>!priv</code> before your message in Discord to encrypt it</p>
-            <p style="font-size: 12px; color: #999; margin-top: 8px;">Discord Cryptochat v2.1.0 - GIF Encryption & Enhanced Media Experience</p>
+            <p style="margin-top: 24px; font-size: 14px; color: #636e72;">
+                Lemonade v1.0.0 - Sweet & Secure Discord Encryption
+            </p>
         </div>
     </div>
 
