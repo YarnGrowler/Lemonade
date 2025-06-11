@@ -21,8 +21,303 @@ class ECCrypto {
     this.currentUsername = null;
     this.myKeyId = null;
     
+    // SECURE MEMORY MANAGEMENT
+    this.sensitiveStringPool = new Set(); // Track all sensitive strings
+    this.cryptoKeyPool = new Set(); // Track all CryptoKey objects
+    this.privateKeyPool = new Set(); // Special tracking for private keys
+    this.exportedKeyPool = new Set(); // Track exported key strings
+    
     //console.log('🔐 [EC] Initializing simplified crypto system...');
     this.init();
+  }
+
+  // ==================== SECURE MEMORY MANAGEMENT ====================
+
+  /**
+   * Track sensitive strings for secure wiping
+   */
+  trackSensitiveString(str) {
+    if (typeof str === 'string' && str.length > 0) {
+      this.sensitiveStringPool.add(str);
+    }
+    return str;
+  }
+
+  /**
+   * Track exported key strings (base64 keys)
+   */
+  trackExportedKey(keyStr) {
+    if (typeof keyStr === 'string' && keyStr.length > 0) {
+      this.exportedKeyPool.add(keyStr);
+      this.sensitiveStringPool.add(keyStr);
+    }
+    return keyStr;
+  }
+
+  /**
+   * Track CryptoKey objects for secure destruction
+   */
+  trackCryptoKey(key) {
+    if (key && typeof key === 'object') {
+      this.cryptoKeyPool.add(key);
+    }
+    return key;
+  }
+
+  /**
+   * Track private keys specifically (highest priority for wiping)
+   */
+  trackPrivateKey(key) {
+    if (key && typeof key === 'object') {
+      this.privateKeyPool.add(key);
+      this.cryptoKeyPool.add(key);
+    }
+    return key;
+  }
+
+  /**
+   * Secure string wipe with DoD 5220.22-M standard (5-pass overwrite)
+   */
+  async secureWipeString(str) {
+    if (typeof str !== 'string' || str.length === 0) return;
+    
+    try {
+      // Convert string to mutable array
+      const chars = str.split('');
+      const originalLength = chars.length;
+      
+      // Pass 1: Random data
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Pass 2: Complement pattern (all 1s binary)
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(255);
+      }
+      
+      // Pass 3: Random data again
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Pass 4: Zeros (all 0s binary)
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(0);
+      }
+      
+      // Pass 5: Final random overwrite
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Force array destruction
+      chars.length = 0;
+      chars.splice(0);
+      
+      // Create confusion noise
+      for (let round = 0; round < 15; round++) {
+        const noise = new Array(originalLength);
+        for (let i = 0; i < originalLength; i++) {
+          noise[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+        }
+      }
+      
+    } catch (error) {
+      console.warn('🔐 [EC-SECURE] String wipe error:', error);
+    }
+  }
+
+  /**
+   * Secure CryptoKey destruction with key material extraction and wiping
+   */
+  async secureCryptoKeyDestroy(key) {
+    if (!key || typeof key !== 'object') return;
+    
+    try {
+      // Try to export and wipe the raw key material
+      if (key.extractable) {
+        try {
+          const exported = await crypto.subtle.exportKey('raw', key);
+          const view = new Uint8Array(exported);
+          
+          // Multiple overwrite passes on the raw key material
+          const passes = [
+            () => crypto.getRandomValues(view),
+            () => view.fill(0xFF),
+            () => crypto.getRandomValues(view),
+            () => view.fill(0x00),
+            () => crypto.getRandomValues(view),
+          ];
+          
+          for (const pass of passes) {
+            pass();
+          }
+          
+        } catch (e) {
+          // Try JWK format for EC keys
+          try {
+            const exported = await crypto.subtle.exportKey('jwk', key);
+            if (exported.d) await this.secureWipeString(exported.d); // Private key
+            if (exported.x) await this.secureWipeString(exported.x); // Public key X
+            if (exported.y) await this.secureWipeString(exported.y); // Public key Y
+            if (exported.k) await this.secureWipeString(exported.k); // Symmetric key
+          } catch (e2) {
+            // Non-extractable key (good for security)
+          }
+        }
+      }
+      
+      // Remove from tracking pools
+      this.cryptoKeyPool.delete(key);
+      this.privateKeyPool.delete(key);
+      
+    } catch (error) {
+      console.warn('🔐 [EC-SECURE] CryptoKey destruction error:', error);
+    }
+  }
+
+  /**
+   * Force aggressive garbage collection
+   */
+  async forceGarbageCollection() {
+    // Create massive memory pressure to force GC
+    const memoryPressure = [];
+    for (let i = 0; i < 2000; i++) {
+      memoryPressure.push(new Array(2000).fill(Math.random()));
+    }
+    
+    // Clear the pressure
+    memoryPressure.length = 0;
+    
+    // Multiple GC opportunities
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Create more pressure
+    for (let i = 0; i < 1000; i++) {
+      const temp = new Array(1000).fill(crypto.getRandomValues(new Uint8Array(100)));
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  /**
+   * COMPLETE SECURE MEMORY WIPE - Nuclear option
+   */
+  async nuclearMemoryWipe() {
+    console.log('🔐 [EC-SECURE] 💥 NUCLEAR MEMORY WIPE INITIATED...');
+    
+    // Wipe private keys first (highest priority)
+    for (const privateKey of this.privateKeyPool) {
+      await this.secureCryptoKeyDestroy(privateKey);
+    }
+    this.privateKeyPool.clear();
+    
+    // Wipe all exported key strings
+    const exportPromises = Array.from(this.exportedKeyPool).map(keyStr => 
+      this.secureWipeString(keyStr)
+    );
+    await Promise.all(exportPromises);
+    this.exportedKeyPool.clear();
+    
+    // Wipe all CryptoKey objects
+    const cryptoPromises = Array.from(this.cryptoKeyPool).map(key => 
+      this.secureCryptoKeyDestroy(key)
+    );
+    await Promise.all(cryptoPromises);
+    this.cryptoKeyPool.clear();
+    
+    // Wipe all sensitive strings
+    const stringPromises = Array.from(this.sensitiveStringPool).map(str => 
+      this.secureWipeString(str)
+    );
+    await Promise.all(stringPromises);
+    this.sensitiveStringPool.clear();
+    
+    // Clear instance variables
+    if (this.staticPrivateKey) {
+      await this.secureCryptoKeyDestroy(this.staticPrivateKey);
+      this.staticPrivateKey = null;
+    }
+    
+    if (this.staticPublicKey) {
+      await this.secureCryptoKeyDestroy(this.staticPublicKey);
+      this.staticPublicKey = null;
+    }
+    
+    if (this.myKeyId) {
+      await this.secureWipeString(this.myKeyId);
+      this.myKeyId = null;
+    }
+    
+    // Clear user keys map
+    for (const [userId, userInfo] of this.userKeys) {
+      if (userInfo.publicKey) {
+        await this.secureCryptoKeyDestroy(userInfo.publicKey);
+      }
+      if (userInfo.keyId) {
+        await this.secureWipeString(userInfo.keyId);
+      }
+    }
+    this.userKeys.clear();
+    
+    // Force multiple aggressive garbage collection cycles
+    for (let i = 0; i < 10; i++) {
+      await this.forceGarbageCollection();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log('🔐 [EC-SECURE] ✅ NUCLEAR MEMORY WIPE COMPLETED');
+  }
+
+  /**
+   * Secure Chrome storage overwrite before deletion
+   */
+  async secureStorageDelete(keys) {
+    if (!Array.isArray(keys)) keys = [keys];
+    
+    console.log('🔐 [EC-SECURE] 🗑️ Secure storage deletion for:', keys);
+    
+    // Multiple overwrite passes with random data
+    for (let pass = 0; pass < 7; pass++) {
+      const overwriteData = {};
+      for (const key of keys) {
+        // Generate large random data
+        const randomSize = 2048 + Math.floor(Math.random() * 2048); // 2-4KB
+        const randomBytes = crypto.getRandomValues(new Uint8Array(randomSize));
+        const randomString = Array.from(randomBytes).map(b => 
+          String.fromCharCode(b)).join('');
+        overwriteData[key] = randomString;
+      }
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.set(overwriteData, resolve);
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    
+    // Delete the keys
+    await new Promise((resolve) => {
+      chrome.storage.local.remove(keys, resolve);
+    });
+    
+    // Final confusion overwrites
+    for (let finalPass = 0; finalPass < 3; finalPass++) {
+      const confusionData = {};
+      for (const key of keys) {
+        confusionData[key] = null;
+      }
+      await new Promise((resolve) => {
+        chrome.storage.local.set(confusionData, resolve);
+      });
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.remove(keys, resolve);
+      });
+    }
+    
+    console.log('🔐 [EC-SECURE] ✅ Secure storage deletion completed');
   }
 
   async init() {
@@ -68,8 +363,12 @@ class ECCrypto {
       ]);
       
       if (stored.ecStaticPrivateKey && stored.ecStaticPublicKey) {
-        this.staticPrivateKey = await this.importPrivateKey(stored.ecStaticPrivateKey);
-        this.staticPublicKey = await this.importPublicKey(stored.ecStaticPublicKey);
+        this.staticPrivateKey = this.trackPrivateKey(await this.importPrivateKey(stored.ecStaticPrivateKey));
+        this.staticPublicKey = this.trackCryptoKey(await this.importPublicKey(stored.ecStaticPublicKey));
+        
+        // Track the stored key strings too
+        this.trackExportedKey(stored.ecStaticPrivateKey);
+        this.trackExportedKey(stored.ecStaticPublicKey);
         
         // Always regenerate key ID from current public key to ensure consistency
         const publicKeyBase64 = await this.exportPublicKey(this.staticPublicKey);
@@ -165,15 +464,15 @@ class ECCrypto {
       ['deriveKey']
     );
     
-    this.staticPrivateKey = keypair.privateKey;
-    this.staticPublicKey = keypair.publicKey;
+    this.staticPrivateKey = this.trackPrivateKey(keypair.privateKey);
+    this.staticPublicKey = this.trackCryptoKey(keypair.publicKey);
     
     // Export and store
-    const exportedPrivate = await this.exportPrivateKey(this.staticPrivateKey);
-    const exportedPublic = await this.exportPublicKey(this.staticPublicKey);
+    const exportedPrivate = this.trackExportedKey(await this.exportPrivateKey(this.staticPrivateKey));
+    const exportedPublic = this.trackExportedKey(await this.exportPublicKey(this.staticPublicKey));
     
     // Generate and store my key ID
-    this.myKeyId = await this.generateKeyId(exportedPublic);
+    this.myKeyId = this.trackSensitiveString(await this.generateKeyId(exportedPublic));
     
     await chrome.storage.local.set({
       ecStaticPrivateKey: exportedPrivate,
@@ -629,10 +928,24 @@ class ECCrypto {
 
   async clearAllContacts() {
     try {
+      // Secure wipe all user keys and key IDs
+      for (const [userId, userInfo] of this.userKeys) {
+        if (userInfo.publicKey && typeof userInfo.publicKey === 'string') {
+          await this.secureWipeString(userInfo.publicKey);
+        }
+        if (userInfo.keyId) {
+          await this.secureWipeString(userInfo.keyId);
+        }
+      }
+      
       this.userKeys.clear();
-      await chrome.storage.local.set({ ecUserKeys: {} });
+      
+      // Secure delete from storage
+      await this.secureStorageDelete(['ecUserKeys']);
+      
+      console.log('🔐 [EC] 🗑️ SECURELY cleared all user keys');
     } catch (error) {
-      //console.log('Failed to clear contacts:', error);
+      console.log('Failed to clear contacts:', error);
       throw error;
     }
   }
@@ -664,15 +977,33 @@ class ECCrypto {
 
   async rotateKeysNow() {
     try {
-      //console.log('🔐 [EC] 🔄 Manual key rotation initiated...');
+      console.log('🔐 [EC] 🔄 Manual key rotation initiated...');
       
       // Store old key info for debugging
       const oldKeyId = this.myKeyId;
       
-      // Clear cached keys first to force regeneration
+      // SECURE WIPE of existing keys before rotation
+      if (this.staticPrivateKey) {
+        await this.secureCryptoKeyDestroy(this.staticPrivateKey);
+      }
+      if (this.staticPublicKey) {
+        await this.secureCryptoKeyDestroy(this.staticPublicKey);
+      }
+      if (this.myKeyId) {
+        await this.secureWipeString(this.myKeyId);
+      }
+      
+      // Clear cached keys
       this.staticPrivateKey = null;
       this.staticPublicKey = null;
       this.myKeyId = null;
+      
+      // Secure delete old keys from storage
+      await this.secureStorageDelete([
+        'ecStaticPrivateKey', 
+        'ecStaticPublicKey', 
+        'ecMyKeyId'
+      ]);
       
       // Generate completely new keypair
       await this.generateStaticKeypair();

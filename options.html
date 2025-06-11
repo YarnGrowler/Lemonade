@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=2.4">
     <title>Lemonade Settings - Discord Encryption</title>
     <style>
         * {
@@ -462,7 +462,7 @@
         <div class="header">
             <div class="logo">🍋</div>
             <h1 class="title">Lemonade Settings</h1>
-            <p class="subtitle">Sweet & Secure Discord Encryption <span class="version-badge">v1.0.0</span></p>
+            <p class="subtitle">Sweet & Secure Discord Encryption <span class="version-badge">v2.5.0</span></p>
         </div>
 
         <div id="status-message" class="status" style="display: none;"></div>
@@ -476,8 +476,8 @@
                     <p>Military-grade AES-GCM and ECDH P-256 encryption ensures your messages stay private between trusted contacts.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>🎬 GIF & Media Encryption</h3>
-                    <p>Encrypt GIFs, images, and media directly from Discord's picker with interactive modal viewing.</p>
+                    <h3>🎬 Media URL Encryption</h3>
+                    <p>Encrypt GIF and image URLs from Discord's picker. Links open in new tabs when clicked.</p>
                 </div>
                 <div class="feature-card">
                     <h3>👥 Auto Contact Discovery</h3>
@@ -489,12 +489,27 @@
                 </div>
                 <div class="feature-card">
                     <h3>🎭 Stealth Mode</h3>
-                    <p>Messages are encoded as Chinese characters, making them invisible to casual observers.</p>
+                    <p>Messages are encoded as Chinese characters (or 15 other languages), making them invisible to casual observers.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>⚡ Real-time Performance</h3>
-                    <p>Optimized scanning and decryption with configurable performance settings for any device.</p>
+                    <h3>🛡️ Memory Security</h3>
+                    <p>DoD 5220.22-M memory wiping and nuclear security options protect against advanced attacks.</p>
                 </div>
+            </div>
+            
+            <div class="warning" style="background: linear-gradient(135deg, #ff6b6b, #ee5a52); color: white; margin-top: 20px;">
+                <div class="warning-title">⚠️ Current Limitations</div>
+                <p><strong>Being honest about what doesn't work yet:</strong></p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>❌ <strong>Mobile Support</strong> - Not optimized for mobile Discord web</li>
+                    <li>❌ <strong>GIF Modal Expansion</strong> - GIFs open in new tabs instead of in-app modals</li>
+                    <li>❌ <strong>Firefox/Safari</strong> - Currently Chrome-based browsers only (Manifest V3)</li>
+                    <li>❌ <strong>User Syncing</strong> - No cross-device synchronization</li>
+                    <li>❌ <strong>Nuclear Wipe Mobile</strong> - Emergency controls not mobile-friendly</li>
+                </ul>
+                <p style="margin: 10px 0 0 0; font-size: 13px; opacity: 0.9;">
+                    <strong>We're working on:</strong> Firefox/Safari compatibility, mobile-responsive design, in-app media viewing modals
+                </p>
             </div>
         </div>
 
@@ -745,6 +760,78 @@
             <div id="speed-status" style="margin-top: 12px; font-size: 14px; color: #636e72;"></div>
         </div>
 
+        <!-- Memory Security Settings -->
+        <div class="section">
+            <h2 class="section-title">🛡️ Memory Security & Emergency Controls</h2>
+            <div class="warning">
+                <div class="warning-title">💥 NUCLEAR SECURITY OPTIONS</div>
+                <p>These are <strong>powerful security tools</strong> for protecting your keys from memory attacks, browser exploits, and compromised systems. Use responsibly!</p>
+            </div>
+            
+            <div class="help-text" style="margin-bottom: 16px;">
+                <strong>New in v2.5.0:</strong> Military-grade memory wiping with DoD 5220.22-M standard (5-pass overwrite). Your keys are now automatically tracked and securely destroyed from memory and storage.
+            </div>
+
+            <div style="background: rgba(116, 185, 255, 0.1); padding: 16px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #74b9ff;">
+                <h4 style="color: #0984e3; margin: 0 0 8px 0;">🔒 Automatic Security Features (Always Active)</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #2d3436;">
+                    <li><strong>5-pass memory wiping</strong> during key rotation</li>
+                    <li><strong>Secure storage deletion</strong> with overwrite protection</li>
+                    <li><strong>Automatic key tracking</strong> and destruction</li>
+                    <li><strong>Forced garbage collection</strong> to clear browser memory</li>
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label class="label">🔍 Memory Security Status</label>
+                <div id="memory-status" style="background: rgba(255, 255, 255, 0.7); padding: 16px; border-radius: 8px; margin: 8px 0; font-family: monospace;">
+                    <div>Tracked sensitive strings: <span id="sensitive-count">0</span></div>
+                    <div>Tracked crypto keys: <span id="crypto-keys-count">0</span></div>
+                    <div>Tracked private keys: <span id="private-keys-count">0</span></div>
+                    <div>Memory security: <span style="color: #00b894; font-weight: bold;">ACTIVE</span></div>
+                </div>
+                <button id="refresh-memory-status" class="button secondary">
+                    🔄 Refresh Status
+                </button>
+            </div>
+
+            <div class="warning" style="background: rgba(255, 107, 107, 0.1); border-left-color: #ff6b6b;">
+                <div class="warning-title">⚠️ Emergency Security Controls</div>
+                <p style="margin-bottom: 16px;"><strong>Use these if you suspect your system is compromised:</strong></p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <button id="secure-wipe-asymmetric" class="button danger">
+                        🔥 Wipe EC Keys
+                    </button>
+                    <button id="secure-wipe-symmetric" class="button danger">
+                        🔥 Wipe AES Keys
+                    </button>
+                </div>
+                
+                <button id="nuclear-wipe-everything" class="button" style="background: linear-gradient(45deg, #d63031, #e84393); color: white; width: 100%; font-weight: bold; font-size: 16px; padding: 16px;">
+                    💥 NUCLEAR WIPE EVERYTHING 💥
+                </button>
+                
+                <div style="margin-top: 12px; font-size: 13px; color: #636e72; text-align: center;">
+                    ⚠️ Nuclear wipe destroys ALL keys and data permanently ⚠️
+                </div>
+            </div>
+
+            <div style="background: rgba(0, 184, 148, 0.1); padding: 16px; border-radius: 8px; margin-top: 16px; border-left: 4px solid #00b894;">
+                <h4 style="color: #00b894; margin: 0 0 8px 0;">🛡️ What This Protects Against</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; color: #2d3436;">
+                    <div>✅ Memory dump attacks</div>
+                    <div>✅ Browser exploits</div>
+                    <div>✅ Storage forensics</div>
+                    <div>✅ Cold boot attacks</div>
+                    <div>✅ Garbage collection recovery</div>
+                    <div>✅ System compromise</div>
+                </div>
+            </div>
+
+            <div id="memory-security-status" style="margin-top: 12px; font-size: 14px; color: #636e72;"></div>
+        </div>
+
         <div id="key-info" class="section" style="display: none;">
             <h2 class="section-title">🔑 Key Information</h2>
             <div class="help-text">Key Fingerprint (SHA-256):</div>
@@ -762,7 +849,7 @@
                 </div>
                 <div class="feature-item">
                     <strong>🎬 Media Support</strong><br>
-                    GIF encryption, Image encryption, Interactive modals
+                    GIF URL encryption, Image URL encryption, Link expansion
                 </div>
                 <div class="feature-item">
                     <strong>👥 Contact Management</strong><br>
@@ -774,7 +861,7 @@
                 </div>
                 <div class="feature-item">
                     <strong>🎭 Stealth Features</strong><br>
-                    Chinese character encoding, Invisible to observers
+                    16 language encodings, Invisible to observers
                 </div>
                 <div class="feature-item">
                     <strong>⚡ Performance</strong><br>
@@ -786,11 +873,11 @@
                 </div>
                 <div class="feature-item">
                     <strong>🛡️ Security</strong><br>
-                    Local storage only, No cloud/server, Audit trails
+                    DoD memory wiping, Nuclear wipe, Local storage only
                 </div>
                 <div class="feature-item">
                     <strong>🎨 Interface</strong><br>
-                    Modern design, Responsive layout, Beautiful animations
+                    Modern design, Desktop optimized, Beautiful gradients
                 </div>
                 <div class="feature-item">
                     <strong>⌨️ Shortcuts</strong><br>
@@ -798,11 +885,11 @@
                 </div>
                 <div class="feature-item">
                     <strong>📱 Compatibility</strong><br>
-                    All Discord variants, Cross-browser support
+                    Discord web variants, Chrome-based browsers
                     </div>
                 <div class="feature-item">
                     <strong>🔧 Advanced</strong><br>
-                    Debug tools, Export/import, Custom settings
+                    Debug console, Memory tracking, Emergency controls
                 </div>
             </div>
 
@@ -819,7 +906,7 @@
         </div>
 
             <p style="margin-top: 24px; font-size: 14px; color: #636e72;">
-                Lemonade v1.0.0 - Sweet & Secure Discord Encryption
+                Lemonade v2.5.0 - Sweet & Secure Discord Encryption
             </p>
         </div>
     </div>

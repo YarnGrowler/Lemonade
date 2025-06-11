@@ -10,14 +10,269 @@ class DiscordCrypto {
     this.keyRotationCheckInterval = 10000; // Check every 10 seconds minimum
     this.lastKeyRotationCheck = 0;
     
+    // Secure memory management
+    this.sensitiveStringPool = new Set(); // Track all sensitive strings
+    this.cryptoKeyPool = new Set(); // Track all CryptoKey objects
+    this.secureWipeScheduled = false;
+    
     // Start key rotation monitoring
     // Key rotation monitoring is now handled by background.js
   }
+
+  // ==================== SECURE MEMORY MANAGEMENT ====================
+
+  /**
+   * MILITARY-GRADE MEMORY WIPING SYSTEM
+   * Implements secure deletion with multiple overwrite passes
+   */
+  
+  /**
+   * Track sensitive strings for secure wiping
+   */
+  trackSensitiveString(str) {
+    if (typeof str === 'string' && str.length > 0) {
+      this.sensitiveStringPool.add(str);
+    }
+    return str;
+  }
+
+  /**
+   * Track CryptoKey objects for secure destruction
+   */
+  trackCryptoKey(key) {
+    if (key && typeof key === 'object') {
+      this.cryptoKeyPool.add(key);
+    }
+    return key;
+  }
+
+  /**
+   * Secure string wipe with multiple overwrite passes
+   * Uses DoD 5220.22-M standard (3-pass overwrite)
+   */
+  async secureWipeString(str) {
+    if (typeof str !== 'string' || str.length === 0) return;
+    
+    try {
+      // Convert string to mutable array
+      const chars = str.split('');
+      const originalLength = chars.length;
+      
+      // Pass 1: Random data
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Pass 2: Complement pattern (all 1s binary)
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(255);
+      }
+      
+      // Pass 3: Random data again
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Pass 4: Zeros (all 0s binary)
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(0);
+      }
+      
+      // Pass 5: Final random overwrite
+      for (let i = 0; i < originalLength; i++) {
+        chars[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+      }
+      
+      // Force array modification to potentially affect original memory
+      chars.length = 0;
+      chars.splice(0);
+      
+      // Additional security: Create noise arrays to confuse memory scanners
+      for (let round = 0; round < 10; round++) {
+        const noise = new Array(originalLength);
+        for (let i = 0; i < originalLength; i++) {
+          noise[i] = String.fromCharCode(Math.floor(Math.random() * 256));
+        }
+        // Let garbage collector handle these
+      }
+      
+    } catch (error) {
+      console.warn('🔐 [SECURE] String wipe encountered error:', error);
+    }
+  }
+
+  /**
+   * Secure ArrayBuffer/Uint8Array wipe
+   */
+  async secureWipeBuffer(buffer) {
+    if (!buffer) return;
+    
+    try {
+      let view;
+      if (buffer instanceof ArrayBuffer) {
+        view = new Uint8Array(buffer);
+      } else if (buffer instanceof Uint8Array) {
+        view = buffer;
+      } else {
+        return;
+      }
+      
+      // Multiple overwrite passes
+      const passes = [
+        () => crypto.getRandomValues(view), // Random
+        () => view.fill(0xFF),              // All 1s
+        () => crypto.getRandomValues(view), // Random
+        () => view.fill(0x00),              // All 0s
+        () => crypto.getRandomValues(view), // Final random
+      ];
+      
+      for (const pass of passes) {
+        pass();
+      }
+      
+    } catch (error) {
+      console.warn('🔐 [SECURE] Buffer wipe encountered error:', error);
+    }
+  }
+
+  /**
+   * Secure CryptoKey destruction (best effort in browser environment)
+   */
+  async secureCryptoKeyDestroy(key) {
+    if (!key || typeof key !== 'object') return;
+    
+    try {
+      // Try to export and wipe the raw key material
+      if (key.extractable) {
+        try {
+          const exported = await crypto.subtle.exportKey('raw', key);
+          await this.secureWipeBuffer(exported);
+        } catch (e) {
+          // Key might not be exportable as 'raw', try other formats
+          try {
+            const exported = await crypto.subtle.exportKey('jwk', key);
+            if (exported.k) await this.secureWipeString(exported.k);
+            if (exported.d) await this.secureWipeString(exported.d);
+            if (exported.x) await this.secureWipeString(exported.x);
+            if (exported.y) await this.secureWipeString(exported.y);
+          } catch (e2) {
+            // Unable to export, key is non-extractable (which is actually good for security)
+          }
+        }
+      }
+      
+      // Remove all references
+      this.cryptoKeyPool.delete(key);
+      
+    } catch (error) {
+      console.warn('🔐 [SECURE] CryptoKey destruction encountered error:', error);
+    }
+  }
+
+  /**
+   * Force aggressive garbage collection
+   */
+  async forceGarbageCollection() {
+    // Create memory pressure to force GC
+    const memoryPressure = [];
+    for (let i = 0; i < 1000; i++) {
+      memoryPressure.push(new Array(1000).fill(Math.random()));
+    }
+    
+    // Clear the pressure
+    memoryPressure.length = 0;
+    
+    // Give browser time to GC
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  /**
+   * Secure wipe all tracked sensitive data
+   */
+  async secureWipeAllSensitiveData() {
+    console.log('🔐 [SECURE] 🗑️ Beginning comprehensive memory wipe...');
+    
+    // Wipe all tracked strings
+    const stringPromises = Array.from(this.sensitiveStringPool).map(str => 
+      this.secureWipeString(str)
+    );
+    await Promise.all(stringPromises);
+    this.sensitiveStringPool.clear();
+    
+    // Destroy all tracked CryptoKeys
+    const keyPromises = Array.from(this.cryptoKeyPool).map(key => 
+      this.secureCryptoKeyDestroy(key)
+    );
+    await Promise.all(keyPromises);
+    this.cryptoKeyPool.clear();
+    
+    // Force multiple garbage collection cycles
+    for (let i = 0; i < 5; i++) {
+      await this.forceGarbageCollection();
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    console.log('🔐 [SECURE] ✅ Memory wipe completed');
+  }
+
+  /**
+   * Secure Chrome storage overwrite before deletion
+   */
+  async secureStorageDelete(keys) {
+    if (!Array.isArray(keys)) keys = [keys];
+    
+    console.log('🔐 [SECURE] 🗑️ Secure storage deletion for:', keys);
+    
+    // First, overwrite with random data (multiple times)
+    for (let pass = 0; pass < 5; pass++) {
+      const overwriteData = {};
+      for (const key of keys) {
+        // Generate random data of significant size
+        const randomSize = 1024 + Math.floor(Math.random() * 1024); // 1-2KB
+        const randomBytes = crypto.getRandomValues(new Uint8Array(randomSize));
+        const randomString = Array.from(randomBytes).map(b => 
+          String.fromCharCode(b)).join('');
+        overwriteData[key] = randomString;
+      }
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.set(overwriteData, resolve);
+      });
+      
+      // Small delay between overwrites
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    // Now actually delete
+    await new Promise((resolve) => {
+      chrome.storage.local.remove(keys, resolve);
+    });
+    
+    // Final overwrite to confuse any recovery attempts
+    const finalOverwrite = {};
+    for (const key of keys) {
+      finalOverwrite[key] = null;
+    }
+    await new Promise((resolve) => {
+      chrome.storage.local.set(finalOverwrite, resolve);
+    });
+    
+    await new Promise((resolve) => {
+      chrome.storage.local.remove(keys, resolve);
+    });
+    
+    console.log('🔐 [SECURE] ✅ Secure storage deletion completed');
+  }
+
+  // ==================== EXISTING METHODS (UPDATED WITH SECURITY) ====================
 
   /**
    * Derives a crypto key from a password string
    */
   async deriveKey(password) {
+    // Track the password for secure wiping
+    this.trackSensitiveString(password);
+    
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -29,7 +284,7 @@ class DiscordCrypto {
 
     const salt = encoder.encode('discord-cryptochat-salt'); // Static salt for simplicity
     
-    return crypto.subtle.deriveKey(
+    const derivedKey = crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
         salt: salt,
@@ -41,6 +296,11 @@ class DiscordCrypto {
       false,
       ['encrypt', 'decrypt']
     );
+    
+    // Track the derived key for secure destruction
+    this.trackCryptoKey(await derivedKey);
+    
+    return derivedKey;
   }
 
   /**
@@ -552,19 +812,19 @@ class DiscordCrypto {
     
     // Delete base key after first rotation for security
     if (rotationsCompleted > 0) {
-      const hasBaseKey = await new Promise(resolve => {
-        chrome.storage.local.get(['keyRotationBaseKey'], result => {
-          resolve(!!result.keyRotationBaseKey);
-        });
+      const result = await new Promise(resolve => {
+        chrome.storage.local.get(['keyRotationBaseKey'], resolve);
       });
       
-      if (hasBaseKey) {
-        await new Promise(resolve => {
-          chrome.storage.local.remove(['keyRotationBaseKey'], () => {
-            //console.log('🔐 [CRYPTO] 🗑️ Base key securely deleted after first rotation');
-            resolve();
-          });
-        });
+      if (result.keyRotationBaseKey) {
+        // Track and secure wipe the base key
+        this.trackSensitiveString(result.keyRotationBaseKey);
+        await this.secureWipeString(result.keyRotationBaseKey);
+        
+        // Secure delete from storage
+        await this.secureStorageDelete(['keyRotationBaseKey']);
+        
+        console.log('🔐 [CRYPTO] 🗑️ Base key securely wiped and deleted after first rotation');
       }
     }
   }

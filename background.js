@@ -210,10 +210,61 @@ class BackgroundKeyRotation {
     if (rotationData.count >= 1) {
       const result = await chrome.storage.local.get(['keyRotationBaseKey']);
       if (result.keyRotationBaseKey) {
-        await chrome.storage.local.remove(['keyRotationBaseKey']);
-        //console.log('🔐 [BACKGROUND] 🗑️ Base key securely deleted after first rotation');
+        // Use secure deletion
+        await this.secureStorageDelete(['keyRotationBaseKey']);
+        console.log('🔐 [BACKGROUND] 🗑️ Base key securely wiped after first rotation');
       }
     }
+  }
+
+  /**
+   * Secure Chrome storage overwrite before deletion (for background script)
+   */
+  async secureStorageDelete(keys) {
+    if (!Array.isArray(keys)) keys = [keys];
+    
+    console.log('🔐 [BACKGROUND] 🗑️ Secure storage deletion for:', keys);
+    
+    // Multiple overwrite passes with random data
+    for (let pass = 0; pass < 5; pass++) {
+      const overwriteData = {};
+      for (const key of keys) {
+        // Generate random data
+        const randomSize = 1024 + Math.floor(Math.random() * 1024); // 1-2KB
+        const randomBytes = crypto.getRandomValues(new Uint8Array(randomSize));
+        const randomString = Array.from(randomBytes).map(b => 
+          String.fromCharCode(b)).join('');
+        overwriteData[key] = randomString;
+      }
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.set(overwriteData, resolve);
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    // Delete the keys
+    await new Promise((resolve) => {
+      chrome.storage.local.remove(keys, resolve);
+    });
+    
+    // Final confusion overwrites
+    for (let finalPass = 0; finalPass < 2; finalPass++) {
+      const confusionData = {};
+      for (const key of keys) {
+        confusionData[key] = null;
+      }
+      await new Promise((resolve) => {
+        chrome.storage.local.set(confusionData, resolve);
+      });
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.remove(keys, resolve);
+      });
+    }
+    
+    console.log('🔐 [BACKGROUND] ✅ Secure storage deletion completed');
   }
 
   async notifyContentScriptsKeyUpdate(newKey) {

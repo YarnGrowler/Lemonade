@@ -301,7 +301,7 @@ class PopupManager {
 
     changelogContent.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h2 style="margin: 0; font-size: 20px;">🎉 What's New in v2.1.0</h2>
+        <h2 style="margin: 0; font-size: 20px;">🎉 What's New in v2.2.4</h2>
         <button id="close-changelog" style="
           background: rgba(255,255,255,0.2);
           border: none;

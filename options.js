@@ -283,6 +283,25 @@ class OptionsManager {
     } else {
       console.error('🎭 ❌ Language select not found!');
     }
+
+    // Memory Security event listeners
+    console.log('🛡️ Setting up memory security event listeners...');
+    
+    document.getElementById('refresh-memory-status')?.addEventListener('click', async () => {
+      await this.refreshMemoryStatus();
+    });
+
+    document.getElementById('secure-wipe-asymmetric')?.addEventListener('click', async () => {
+      await this.secureWipeAsymmetric();
+    });
+
+    document.getElementById('secure-wipe-symmetric')?.addEventListener('click', async () => {
+      await this.secureWipeSymmetric();
+    });
+
+    document.getElementById('nuclear-wipe-everything')?.addEventListener('click', async () => {
+      await this.nuclearWipeEverything();
+    });
   }
 
   // Setup asymmetric button listeners after the section is shown
@@ -2427,6 +2446,240 @@ class OptionsManager {
         if (this.languageStatus) {
           this.languageStatus.style.display = 'none';
         }
+      }, 5000);
+    }
+  }
+
+  // ==================== MEMORY SECURITY METHODS ====================
+
+  async refreshMemoryStatus() {
+    console.log('🛡️ Refreshing memory security status...');
+    
+    try {
+      // Get Discord tabs to query memory status
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      if (tabs.length === 0) {
+        this.showMemorySecurityStatus('No Discord tab found. Open Discord to see memory status.', 'info');
+        return;
+      }
+      
+      // Query the content script for memory status
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'getMemoryStatus'
+        });
+        
+        if (response && response.success) {
+          document.getElementById('sensitive-count').textContent = response.sensitiveStrings || 0;
+          document.getElementById('crypto-keys-count').textContent = response.cryptoKeys || 0;
+          document.getElementById('private-keys-count').textContent = response.privateKeys || 0;
+          
+          this.showMemorySecurityStatus(`Memory status updated. Tracking ${response.sensitiveStrings || 0} sensitive items.`, 'success');
+        } else {
+          this.showMemorySecurityStatus('Unable to get memory status from Discord tab.', 'warning');
+        }
+        
+      } catch (error) {
+        this.showMemorySecurityStatus('Could not communicate with Discord tab.', 'error');
+      }
+      
+    } catch (error) {
+      console.error('🛡️ Error refreshing memory status:', error);
+      this.showMemorySecurityStatus('Error refreshing memory status: ' + error.message, 'error');
+    }
+  }
+
+  async secureWipeAsymmetric() {
+    console.log('🛡️ Secure wipe asymmetric keys initiated...');
+    
+    if (!confirm('🔥 SECURE WIPE EC KEYS\n\nThis will securely destroy all EC (asymmetric) cryptographic keys from memory and storage.\n\nYour contacts will be cleared and you\'ll need to rediscover them.\n\nContinue?')) {
+      return;
+    }
+    
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      if (tabs.length === 0) {
+        this.showMemorySecurityStatus('No Discord tab found. Open Discord first.', 'error');
+        return;
+      }
+      
+      const response = await chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'secureWipeAsymmetric'
+      });
+      
+      if (response && response.success) {
+        this.showMemorySecurityStatus('✅ EC keys securely wiped from memory and storage.', 'success');
+        
+        // Refresh the UI after wipe
+        setTimeout(async () => {
+          await this.refreshMemoryStatus();
+          await this.updateCurrentKeyInfo();
+          await this.refreshContactsList();
+        }, 1000);
+      } else {
+        this.showMemorySecurityStatus('❌ EC key wipe failed or incomplete.', 'error');
+      }
+      
+    } catch (error) {
+      console.error('🛡️ Error wiping EC keys:', error);
+      this.showMemorySecurityStatus('Error during EC key wipe: ' + error.message, 'error');
+    }
+  }
+
+  async secureWipeSymmetric() {
+    console.log('🛡️ Secure wipe symmetric keys initiated...');
+    
+    if (!confirm('🔥 SECURE WIPE AES KEYS\n\nThis will securely destroy all AES (symmetric) cryptographic keys from memory and storage.\n\nYou\'ll need to re-enter your encryption key.\n\nContinue?')) {
+      return;
+    }
+    
+    try {
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      if (tabs.length === 0) {
+        this.showMemorySecurityStatus('No Discord tab found. Open Discord first.', 'error');
+        return;
+      }
+      
+      const response = await chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'secureWipeSymmetric'
+      });
+      
+      if (response && response.success) {
+        // Also clear stored symmetric keys
+        await chrome.storage.local.remove([
+          'encryptionKey',
+          'keyRotationBaseKey',
+          'keyRotationEnabled',
+          'keyRotationIntervalMs',
+          'keyRotationStartTimestamp',
+          'lastRotationTimestamp',
+          'rotationCount'
+        ]);
+        
+        this.showMemorySecurityStatus('✅ AES keys securely wiped from memory and storage.', 'success');
+        
+        // Clear the UI
+        document.getElementById('encryption-key').value = '';
+        document.getElementById('key-info').style.display = 'none';
+        
+        // Refresh status
+        setTimeout(async () => {
+          await this.refreshMemoryStatus();
+        }, 1000);
+      } else {
+        this.showMemorySecurityStatus('❌ AES key wipe failed or incomplete.', 'error');
+      }
+      
+    } catch (error) {
+      console.error('🛡️ Error wiping AES keys:', error);
+      this.showMemorySecurityStatus('Error during AES key wipe: ' + error.message, 'error');
+    }
+  }
+
+  async nuclearWipeEverything() {
+    console.log('🛡️ NUCLEAR WIPE EVERYTHING initiated...');
+    
+    const confirmText = '💥 NUCLEAR WIPE EVERYTHING 💥\n\n⚠️ EXTREME CAUTION REQUIRED ⚠️\n\nThis will PERMANENTLY DESTROY:\n• All encryption keys (AES + EC)\n• All contacts and user data\n• All stored settings\n• All cryptographic material\n\nTHIS ACTION CANNOT BE UNDONE!\n\nYou will need to:\n• Re-setup all encryption keys\n• Re-discover all contacts\n• Re-configure all settings\n\nOnly use this if your system is compromised.\n\nType "NUCLEAR WIPE" to confirm:';
+    
+    const userInput = prompt(confirmText);
+    
+    if (userInput !== 'NUCLEAR WIPE') {
+      this.showMemorySecurityStatus('Nuclear wipe cancelled - invalid confirmation.', 'info');
+      return;
+    }
+    
+    try {
+      this.showMemorySecurityStatus('💥 NUCLEAR WIPE IN PROGRESS... DO NOT CLOSE BROWSER', 'error');
+      
+      // Wipe via content script first
+      const tabs = await chrome.tabs.query({url: "*://discord.com/*"});
+      
+      if (tabs.length > 0) {
+        try {
+          await chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'emergencyNuclearWipe'
+          });
+        } catch (error) {
+          console.warn('Could not contact content script, proceeding with storage wipe...');
+        }
+      }
+      
+      // Nuclear storage wipe - everything
+      const allKeys = [
+        'encryptionKey',
+        'keyRotationBaseKey', 
+        'keyRotationEnabled',
+        'keyRotationIntervalMs',
+        'keyRotationStartTimestamp',
+        'lastRotationTimestamp',
+        'rotationCount',
+        'ecStaticPrivateKey',
+        'ecStaticPublicKey', 
+        'ecMyKeyId',
+        'ecKeyGenerated',
+        'ecKeyEntropy',
+        'ecEntropyComponents',
+        'ecUserKeys',
+        'ecCurrentUserId',
+        'ecCurrentUsername',
+        'ecRotationInterval',
+        'ecRotationEpoch',
+        'ecLastRotation',
+        'ecRotationCount',
+        'ecKeyCreated',
+        'stealthLanguage',
+        'scanFrequency',
+        'initialDelay'
+      ];
+      
+      // Multiple overwrite passes
+      for (let pass = 0; pass < 5; pass++) {
+        const overwriteData = {};
+        for (const key of allKeys) {
+          const randomSize = 4096 + Math.floor(Math.random() * 4096);
+          const randomBytes = crypto.getRandomValues(new Uint8Array(randomSize));
+          const randomString = Array.from(randomBytes).map(b => 
+            String.fromCharCode(b)).join('');
+          overwriteData[key] = randomString;
+        }
+        
+        await chrome.storage.local.set(overwriteData);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Final deletion
+      await chrome.storage.local.remove(allKeys);
+      
+      // Clear all UI fields
+      document.getElementById('encryption-key').value = '';
+      document.getElementById('key-info').style.display = 'none';
+      document.getElementById('sensitive-count').textContent = '0';
+      document.getElementById('crypto-keys-count').textContent = '0';
+      document.getElementById('private-keys-count').textContent = '0';
+      
+      this.showMemorySecurityStatus('💥 NUCLEAR WIPE COMPLETED - All cryptographic material destroyed. Refresh Discord to restart.', 'success');
+      
+    } catch (error) {
+      console.error('🛡️ Error during nuclear wipe:', error);
+      this.showMemorySecurityStatus('❌ Nuclear wipe failed: ' + error.message, 'error');
+    }
+  }
+
+  showMemorySecurityStatus(message, type) {
+    const statusDiv = document.getElementById('memory-security-status');
+    if (!statusDiv) return;
+    
+    statusDiv.style.display = 'block';
+    statusDiv.className = `status ${type}`;
+    statusDiv.textContent = message;
+    
+    // Auto-hide after 5 seconds for success messages
+    if (type === 'success') {
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
       }, 5000);
     }
   }

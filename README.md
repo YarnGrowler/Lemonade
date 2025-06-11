@@ -2,7 +2,7 @@
 
 > **Sweet & Secure** - End-to-end encryption for Discord messages with beautiful, seamless protection.
 
-[![Version](https://img.shields.io/badge/version-1.0.0-yellow.svg)](https://github.com/yourusername/lemonade)
+[![Version](https://img.shields.io/badge/version-2.5.0-yellow.svg)](https://github.com/yourusername/lemonade)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/platform-Discord-5865F2.svg)](https://discord.com)
 
@@ -38,36 +38,35 @@ Lemonade is a powerful Discord browser extension that provides **military-grade 
 
 ### 🎬 **Media & Content**
 
-| Feature                 | Description                                     |
-| ----------------------- | ----------------------------------------------- |
-| **GIF Encryption**      | Direct encryption from Discord's GIF picker     |
-| **Image Encryption**    | Secure image sharing with previews              |
-| **Interactive Modals**  | Click-to-view encrypted media (like Discord)    |
-| **Large Emoji Support** | Auto-sizing for single emojis                   |
-| **Video Support**       | Handle media.tenor.com MP4s as animated content |
-| **Responsive Sizing**   | Media fits actual dimensions perfectly          |
+| Feature                 | Description                            |
+| ----------------------- | -------------------------------------- |
+| **GIF Encryption**      | Encrypt GIF URLs from Discord's picker |
+| **Image Encryption**    | Secure image sharing via URLs          |
+| **Link Expansion**      | URLs open in new tab when clicked      |
+| **Large Emoji Support** | Auto-sizing for single emojis          |
+| **Basic Media Support** | Handle common image/GIF formats        |
 
 ### 👥 **Contact Management**
 
-| Feature                   | Description                                    |
-| ------------------------- | ---------------------------------------------- |
-| **Auto-Discovery**        | Automatically find and store contact keys      |
-| **Username Tracking**     | Remember display names for easy identification |
-| **Contact List**          | View all discovered encrypted contacts         |
-| **Key Verification**      | Verify contact public keys                     |
-| **Manual Contact Add**    | Add contacts with known public keys            |
-| **Contact Export/Import** | Backup your contact list                       |
+| Feature                | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| **Auto-Discovery**     | Automatically find and store contact keys      |
+| **Username Tracking**  | Remember display names for easy identification |
+| **Contact List**       | View all discovered encrypted contacts         |
+| **Key Verification**   | Verify contact public keys                     |
+| **Manual Contact Add** | Add contacts with known public keys            |
+| **Contact List View**  | View discovered contacts in options            |
 
 ### 🔄 **Key Management**
 
-| Feature                | Description                                |
-| ---------------------- | ------------------------------------------ |
-| **Automatic Rotation** | Time-based key rotation (1 min to 1 month) |
-| **Manual Rotation**    | Rotate keys on-demand                      |
-| **Key History**        | Track key creation and rotation times      |
-| **Sync Codes**         | Share rotation schedules with contacts     |
-| **Key Export**         | Copy public keys for sharing               |
-| **Emergency Reset**    | Clear all keys and start fresh             |
+| Feature                | Description                             |
+| ---------------------- | --------------------------------------- |
+| **Automatic Rotation** | Time-based key rotation (10s to 1 hour) |
+| **Manual Rotation**    | Rotate keys on-demand                   |
+| **Key History**        | Track key creation and rotation times   |
+| **Key Export**         | Copy public keys for sharing            |
+| **Emergency Reset**    | Clear all keys and start fresh          |
+| **Memory Security**    | DoD 5220.22-M secure memory wiping      |
 
 ### 🎭 **Stealth & Privacy**
 
@@ -90,8 +89,7 @@ Lemonade is a powerful Discord browser extension that provides **military-grade 
 | **Configurable Scan Rates** | 0.5s to 5s message scanning intervals    |
 | **Memory Optimization**     | Efficient CPU and RAM usage              |
 | **Instant Decryption**      | Real-time message decryption             |
-| **Smooth Animations**       | Beautiful fade-in effects                |
-| **Responsive Design**       | Works on all screen sizes                |
+| **Visual Indicators**       | 🔐 icons show encrypted messages         |
 | **Error Recovery**          | Graceful handling of encryption failures |
 
 ### 🎯 **User Interface**
@@ -103,7 +101,7 @@ Lemonade is a powerful Discord browser extension that provides **military-grade 
 | **Visual Indicators** | 🔐 icons show encrypted messages    |
 | **Status Monitoring** | Real-time encryption status         |
 | **Settings Page**     | Comprehensive configuration options |
-| **Mobile-Friendly**   | Responsive design for all devices   |
+| **Desktop Focused**   | Optimized for desktop Discord web   |
 
 ### ⌨️ **Shortcuts & Controls**
 
@@ -118,25 +116,44 @@ Lemonade is a powerful Discord browser extension that provides **military-grade 
 
 ### 🔧 **Advanced Features**
 
-| Feature                 | Description                                |
-| ----------------------- | ------------------------------------------ |
-| **Debug Console**       | Comprehensive logging for troubleshooting  |
-| **Performance Metrics** | Monitor encryption/decryption speed        |
-| **Custom Algorithms**   | Support for additional encryption methods  |
-| **API Integration**     | Programmatic access to encryption features |
-| **Batch Operations**    | Encrypt/decrypt multiple messages          |
-| **Regex Filters**       | Auto-encrypt based on message patterns     |
+| Feature             | Description                                 |
+| ------------------- | ------------------------------------------- |
+| **Debug Console**   | Browser console logging for troubleshooting |
+| **Nuclear Wipe**    | Emergency destroy all cryptographic data    |
+| **Memory Tracking** | Real-time monitoring of sensitive data      |
+| **Secure Deletion** | DoD-standard overwriting of deleted keys    |
 
 ### 📱 **Compatibility**
 
-| Feature            | Description                           |
-| ------------------ | ------------------------------------- |
-| **Discord Web**    | Full support for discord.com          |
-| **Discord Canary** | Support for canary.discord.com        |
-| **Discord PTB**    | Support for ptb.discord.com           |
-| **All Browsers**   | Chrome, Firefox, Edge, Safari support |
-| **Cross-Platform** | Windows, Mac, Linux compatibility     |
-| **Mobile Web**     | Works on mobile Discord web           |
+| Feature            | Description                       |
+| ------------------ | --------------------------------- |
+| **Discord Web**    | Full support for discord.com      |
+| **Discord Canary** | Support for canary.discord.com    |
+| **Discord PTB**    | Support for ptb.discord.com       |
+| **Chrome-based**   | Chrome, Edge, Brave (Manifest V3) |
+| **Desktop Only**   | Designed for desktop Discord web  |
+
+---
+
+## ⚠️ **Current Limitations**
+
+**Being Honest About What Doesn't Work Yet:**
+
+- **❌ Mobile Support** - Not optimized for mobile Discord web
+- **❌ GIF Modal Expansion** - GIFs open in new tabs instead of in-app modals
+- **❌ Firefox/Safari** - Currently Chrome-based browsers only (Manifest V3)
+- **❌ User Syncing** - No cross-device synchronization
+- **❌ Advanced Contact Management** - Basic contact discovery only
+- **❌ Batch Operations** - One message at a time encryption
+- **❌ Custom Algorithms** - Fixed to AES-GCM + ECDH P-256
+- **❌ Nuclear Wipe Mobile** - Emergency controls not mobile-friendly
+
+**We're Working On:**
+
+- Firefox/Safari compatibility (Manifest V2)
+- Mobile-responsive design
+- In-app media viewing modals
+- Enhanced contact management
 
 ---
 

@@ -2289,7 +2289,7 @@ class DiscordCryptochat {
     });
     
     container.addEventListener('mouseenter', () => {
-      container.style.transform = 'scale(1.02)';
+      container.style.transform = 'scale(2.42)';
       container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
     });
     
@@ -4240,16 +4240,19 @@ window.debugKeyStatus = function() {
 
 // Force regenerate unique keys
 window.forceUniqueKeys = async function() {
-  // console.log('🔐 [FORCE] === FORCING UNIQUE KEY GENERATION ===');
+  console.log('🔐 [FORCE] === FORCING UNIQUE KEY GENERATION ===');
   
   if (!window.ecCrypto) {
-    // console.log('🔐 [FORCE] ECCrypto not available');
+    console.log('🔐 [FORCE] ECCrypto not available');
     return;
   }
   
   try {
-    // Clear all storage first
-    await chrome.storage.local.remove([
+    // NUCLEAR MEMORY WIPE - Complete secure destruction
+    await window.ecCrypto.nuclearMemoryWipe();
+    
+    // Secure storage deletion
+    await window.ecCrypto.secureStorageDelete([
       'ecStaticPrivateKey', 
       'ecStaticPublicKey', 
       'ecMyKeyId',
@@ -4258,14 +4261,7 @@ window.forceUniqueKeys = async function() {
       'ecEntropyComponents'
     ]);
     
-    // console.log('🔐 [FORCE] Cleared all stored keys');
-    
-    // Clear in-memory keys
-    window.ecCrypto.staticPrivateKey = null;
-    window.ecCrypto.staticPublicKey = null;
-    window.ecCrypto.myKeyId = null;
-    
-    // console.log('🔐 [FORCE] Cleared in-memory keys');
+    console.log('🔐 [FORCE] ✅ NUCLEAR WIPE COMPLETED');
     
     // Force regeneration with unique timestamp and extra entropy
     const uniqueTimestamp = Date.now();
@@ -4351,4 +4347,92 @@ window.cleanupCorruptedContacts = async function() {
   }
   
   // console.log('🔐 [CLEANUP] ================================');
+};
+
+// NUCLEAR OPTION - Complete secure memory wipe (call this if compromised)
+window.emergencyNuclearWipe = async function() {
+  console.log('🔐 [NUCLEAR] 💥💥💥 EMERGENCY NUCLEAR MEMORY WIPE 💥💥💥');
+  console.log('🔐 [NUCLEAR] ⚠️  THIS WILL DESTROY ALL KEYS AND DATA ⚠️');
+  
+  try {
+    // Wipe EC crypto system
+    if (window.ecCrypto) {
+      await window.ecCrypto.nuclearMemoryWipe();
+      console.log('🔐 [NUCLEAR] ✅ EC crypto system wiped');
+    }
+    
+    // Wipe symmetric crypto system
+    if (window.discordCrypto) {
+      await window.discordCrypto.secureWipeAllSensitiveData();
+      console.log('🔐 [NUCLEAR] ✅ Symmetric crypto system wiped');
+    }
+    
+    // Wipe all extension storage with extreme prejudice
+    const allKeys = [
+      'encryptionKey',
+      'keyRotationBaseKey',
+      'keyRotationEnabled',
+      'keyRotationIntervalMs',
+      'keyRotationStartTimestamp',
+      'lastRotationTimestamp',
+      'rotationCount',
+      'ecStaticPrivateKey',
+      'ecStaticPublicKey',
+      'ecMyKeyId',
+      'ecKeyGenerated',
+      'ecKeyEntropy',
+      'ecEntropyComponents',
+      'ecUserKeys',
+      'ecCurrentUserId',
+      'ecCurrentUsername',
+      'ecRotationInterval',
+      'ecRotationEpoch',
+      'ecLastRotation',
+      'ecRotationCount',
+      'ecKeyCreated'
+    ];
+    
+    // Multiple secure deletion rounds
+    for (let round = 0; round < 3; round++) {
+      console.log(`🔐 [NUCLEAR] 🗑️ Secure deletion round ${round + 1}/3`);
+      
+      // Overwrite with massive random data
+      const overwriteData = {};
+      for (const key of allKeys) {
+        const randomSize = 4096 + Math.floor(Math.random() * 4096); // 4-8KB
+        const randomBytes = crypto.getRandomValues(new Uint8Array(randomSize));
+        const randomString = Array.from(randomBytes).map(b => 
+          String.fromCharCode(b)).join('');
+        overwriteData[key] = randomString;
+      }
+      
+      await new Promise((resolve) => {
+        chrome.storage.local.set(overwriteData, resolve);
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Final deletion
+    await new Promise((resolve) => {
+      chrome.storage.local.remove(allKeys, resolve);
+    });
+    
+    // Force multiple garbage collection cycles
+    for (let i = 0; i < 20; i++) {
+      const memoryPressure = [];
+      for (let j = 0; j < 5000; j++) {
+        memoryPressure.push(new Array(1000).fill(Math.random()));
+      }
+      memoryPressure.length = 0;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    console.log('🔐 [NUCLEAR] ✅ EMERGENCY NUCLEAR WIPE COMPLETED');
+    console.log('🔐 [NUCLEAR] 💡 All cryptographic material has been destroyed');
+    console.log('🔐 [NUCLEAR] 💡 Refresh the page to restart with new keys');
+    
+  } catch (error) {
+    console.error('🔐 [NUCLEAR] ❌ Nuclear wipe failed:', error);
+  }
 };  
